@@ -178,7 +178,7 @@ function ConfigTab({ section }: { section: ConfigSection }) {
         <SectionCard title="Google OAuth" icon={<Settings size={14} />}>
           <AdminInput label="Google Client ID" value={cfg.googleClientId} onChange={v => setCfg({ ...cfg, googleClientId: v })} placeholder="123456789-xxx.apps.googleusercontent.com" />
           <SecretField label="Google Client Secret" field="googleClientSecret" placeholder="GOCSPX-..." {...secretInputProps} />
-          <AdminInput label="Redirect URI" value={cfg.googleRedirectUri} onChange={v => setCfg({ ...cfg, googleRedirectUri: v })} placeholder="https://your-worker.workers.dev/api/auth/google/callback" />
+          <AdminInput label="Redirect URI" value={cfg.googleRedirectUri} onChange={v => setCfg({ ...cfg, googleRedirectUri: v })} placeholder="https://voicera-api.YOUR-NAME.workers.dev/api/auth/google/callback" />
           <div className="text-xs rounded-xl px-3 py-2 font-mono" style={{ background: 'rgba(32,210,160,0.06)', color: 'rgba(240,250,247,0.5)', wordBreak: 'break-all' }}>
             {cfg.googleRedirectUri || 'Set Redirect URI above, then paste it in Google Console → Authorised redirect URIs'}
           </div>
@@ -186,7 +186,7 @@ function ConfigTab({ section }: { section: ConfigSection }) {
       </>}
 
       {section === 'flutterwave' && <>
-        <InfoBanner icon={<Banknote size={13} />} text="Set your Flutterwave webhook URL to: https://your-worker.workers.dev/api/payment/webhook" />
+        <InfoBanner icon={<Banknote size={13} />} text="Set your Flutterwave webhook URL to: https://voicera-api.YOUR-NAME.workers.dev/api/payment/webhook" />
         <SectionCard title="Flutterwave Payments" icon={<Banknote size={14} />}>
           <AdminInput label="Public Key" value={cfg.flutterwavePublicKey} onChange={v => setCfg({ ...cfg, flutterwavePublicKey: v })} placeholder="FLWPUBK-..." />
           <SecretField label="Secret Key" field="flutterwaveSecretKey" placeholder="FLWSECK-..." {...secretInputProps} />
