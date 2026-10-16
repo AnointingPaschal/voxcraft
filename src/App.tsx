@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, getSetupStatus, type UsageData } from './lib/api'
+import { synthesize, getUsage, type UsageData } from './lib/api'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
@@ -82,6 +82,7 @@ export default function App(): JSX.Element {
   const [setupChecked, setSetupChecked] = useState(false)
   const [needsSetup, setNeedsSetup] = useState(false)
   const [workerDown, setWorkerDown] = useState(false)
+  const [kvMissing, setKvMissing] = useState(false)
 
   const setPage = (p: Page) => {
     setPageState(p)
@@ -97,8 +98,13 @@ export default function App(): JSX.Element {
 
   // Check setup status once on mount
   useEffect(() => {
-    getSetupStatus()
-      .then(s => { if (!s.setupComplete) setNeedsSetup(true) })
+    fetch('/api/setup/status')
+      .then(async r => {
+        if (r.status === 500 || r.status === 503) { setKvMissing(true); return }
+        if (!r.ok) { setWorkerDown(true); return }
+        const s = await r.json() as { setupComplete: boolean }
+        if (!s.setupComplete) setNeedsSetup(true)
+      })
       .catch(() => setWorkerDown(true))
       .finally(() => setSetupChecked(true))
   }, [])
@@ -120,22 +126,31 @@ export default function App(): JSX.Element {
     </div>
   )
 
-  if (workerDown) return (
+  if (kvMissing || workerDown) return (
     <div className="min-h-dvh flex items-center justify-center px-6" style={{ background: '#0a121e' }}>
-      <div className="max-w-md w-full rounded-2xl p-8 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(32,210,160,0.12)' }}>
-          <AudioWaveform size={24} style={{ color: '#20d2a0' }} />
+      <div className="max-w-md w-full rounded-2xl p-8 text-center space-y-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(32,210,160,0.12)' }}>
+          <AudioWaveform size={26} style={{ color: '#20d2a0' }} />
         </div>
-        <h2 className="text-xl font-bold" style={{ color: '#f0faf7' }}>Worker API Not Connected</h2>
-        <p className="text-sm leading-relaxed" style={{ color: 'rgba(240,250,247,0.55)' }}>
-          The Voicera backend Worker is not reachable. Make sure you have deployed the Worker to Cloudflare and set <code className="px-1 py-0.5 rounded text-xs" style={{ background: 'rgba(32,210,160,0.1)', color: '#20d2a0' }}>VITE_API_BASE</code> in your Pages environment variables.
-        </p>
-        <div className="text-xs rounded-xl px-4 py-3 text-left font-mono space-y-1" style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(240,250,247,0.5)' }}>
-          <div>VITE_API_BASE=https://voicera-api</div>
-          <div style={{ color: 'rgba(240,250,247,0.3)' }}>.YOUR-NAME.workers.dev</div>
-        </div>
+        {kvMissing ? (<>
+          <h2 className="text-xl font-bold" style={{ color: '#f0faf7' }}>KV Database Not Bound</h2>
+          <p className="text-sm leading-relaxed" style={{ color: 'rgba(240,250,247,0.55)' }}>
+            The backend is running but the KV database is not attached. Do this in your Cloudflare dashboard:
+          </p>
+          <div className="text-xs rounded-xl px-4 py-4 text-left space-y-2" style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(240,250,247,0.7)' }}>
+            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>1.</span><span>Create a KV namespace named <strong>voicera-kv</strong></span></div>
+            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>2.</span><span>voicera Pages → Settings → Functions → KV namespace bindings → Add</span></div>
+            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>3.</span><span>Variable name: <code style={{ color: '#20d2a0' }}>KV</code>, select voicera-kv → Save</span></div>
+            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>4.</span><span>Deployments tab → Retry deployment</span></div>
+          </div>
+        </>) : (<>
+          <h2 className="text-xl font-bold" style={{ color: '#f0faf7' }}>Cannot Reach Backend</h2>
+          <p className="text-sm leading-relaxed" style={{ color: 'rgba(240,250,247,0.55)' }}>
+            The API functions are not responding. Check that your Pages deployment completed successfully and the Functions tab shows compiled functions.
+          </p>
+        </>)}
         <button onClick={() => window.location.reload()} className="w-full py-3 rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg,#20d2a0,#17a882)', color: '#fff' }}>
-          Retry Connection
+          Retry
         </button>
       </div>
     </div>
