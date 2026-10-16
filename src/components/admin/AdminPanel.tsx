@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Settings, Users, CreditCard, BarChart2, Save, Loader2,
-  CheckCircle2, Key, Globe, Palette, Eye, EyeOff, ChevronDown, ChevronUp,
-  ShieldCheck, Banknote,
+  LayoutDashboard, Globe, Key, Chrome, Banknote, ShieldCheck,
+  CreditCard, Users, Save, Loader2, CheckCircle2, Eye, EyeOff,
+  ChevronDown, ChevronUp, ArrowLeft, AudioWaveform, Menu,
+  TrendingUp, UserCheck, Zap, AlertTriangle, Palette, Settings,
+  type LucideIcon,
 } from 'lucide-react'
 import {
   adminGetConfig, adminPatchConfig, adminGetPlans, adminPutPlans,
@@ -10,63 +13,183 @@ import {
   type FullSiteConfig, type Plan, type AuthUser, type AdminStats,
 } from '../../lib/api'
 
-type Tab = 'stats' | 'config' | 'voice' | 'google' | 'flutterwave' | 'security' | 'plans' | 'users'
+// ── Types ─────────────────────────────────────────────────────────────────────
+type Tab = 'overview' | 'site' | 'voice' | 'google' | 'payments' | 'security' | 'plans' | 'users'
 
+interface NavItem { id: Tab; label: string; icon: LucideIcon, group: string }
+
+const NAV: NavItem[] = [
+  { id: 'overview',  label: 'Overview',   icon: LayoutDashboard, group: 'Dashboard' },
+  { id: 'users',     label: 'Users',      icon: Users,           group: 'Dashboard' },
+  { id: 'site',      label: 'Site',       icon: Globe,           group: 'Settings' },
+  { id: 'voice',     label: 'Voice API',  icon: AudioWaveform,   group: 'Settings' },
+  { id: 'google',    label: 'Google',     icon: Chrome,          group: 'Settings' },
+  { id: 'payments',  label: 'Payments',   icon: Banknote,        group: 'Settings' },
+  { id: 'plans',     label: 'Plans',      icon: CreditCard,      group: 'Settings' },
+  { id: 'security',  label: 'Security',   icon: ShieldCheck,     group: 'Settings' },
+]
+
+const GROUPS = ['Dashboard', 'Settings']
+
+// ── Tokens ────────────────────────────────────────────────────────────────────
+const T = {
+  bg:       '#080f18',
+  sidebar:  '#0b1520',
+  surface:  'rgba(255,255,255,0.04)',
+  border:   'rgba(255,255,255,0.07)',
+  accent:   '#20d2a0',
+  accentBg: 'rgba(32,210,160,0.1)',
+  accentBorder: 'rgba(32,210,160,0.25)',
+  text:     '#e8f4ef',
+  muted:    'rgba(232,244,239,0.45)',
+  dim:      'rgba(232,244,239,0.25)',
+  red:      '#ff6b8a',
+  redBg:    'rgba(186,43,76,0.12)',
+}
+
+// ── Root ──────────────────────────────────────────────────────────────────────
 export default function AdminPanel({ onBack }: { onBack: () => void }) {
-  const [tab, setTab] = useState<Tab>('stats')
+  const [tab, setTab] = useState<Tab>('overview')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  const tabs: { id: Tab; label: string; icon: typeof Settings }[] = [
-    { id: 'stats', label: 'Overview', icon: BarChart2 },
-    { id: 'config', label: 'Site', icon: Globe },
-    { id: 'voice', label: 'Voice API', icon: Key },
-    { id: 'google', label: 'Google', icon: Settings },
-    { id: 'flutterwave', label: 'Payments', icon: Banknote },
-    { id: 'security', label: 'Security', icon: ShieldCheck },
-    { id: 'plans', label: 'Plans', icon: CreditCard },
-    { id: 'users', label: 'Users', icon: Users },
-  ]
+  const current = NAV.find(n => n.id === tab)!
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="display text-xl font-bold" style={{ color: '#f0faf7' }}>Admin Panel</h1>
-          <p className="text-xs mt-0.5" style={{ color: 'rgba(240,250,247,0.4)' }}>Manage VoxCraft Studio</p>
-        </div>
-        <button type="button" onClick={onBack} className="text-xs px-3 py-1.5 rounded-lg"
-          style={{ color: 'rgba(240,250,247,0.5)', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
-          Back to Studio
-        </button>
-      </div>
+    <div className="min-h-dvh flex" style={{ background: T.bg, fontFamily: "'DM Sans', sans-serif" }}>
 
-      {/* Tab nav */}
-      <div className="flex gap-1 rounded-xl p-1 mb-6" style={{ background: 'rgba(0,0,0,0.3)' }}>
-        {tabs.map(t => (
-          <button key={t.id} type="button" onClick={() => setTab(t.id)}
-            className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all"
-            style={tab === t.id
-              ? { background: 'rgba(32,210,160,0.15)', color: '#20d2a0', border: '1px solid rgba(32,210,160,0.3)' }
-              : { color: 'rgba(240,250,247,0.45)', border: '1px solid transparent' }}>
-            <t.icon size={12} />
-            {t.label}
+      {/* Sidebar */}
+      <>
+        {/* Mobile overlay */}
+        <AnimatePresence>
+          {sidebarOpen && (
+            <motion.div
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 z-30 lg:hidden"
+              style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {/* Sidebar panel */}
+        <motion.aside
+          initial={false}
+          animate={{ x: sidebarOpen ? 0 : '-100%' }}
+          transition={{ type: 'spring', stiffness: 320, damping: 32 }}
+          className="fixed top-0 left-0 h-full z-40 w-64 flex flex-col lg:hidden"
+          style={{ background: T.sidebar, borderRight: `1px solid ${T.border}` }}
+        >
+          <SidebarContent tab={tab} setTab={t => { setTab(t); setSidebarOpen(false) }} onBack={onBack} />
+        </motion.aside>
+
+        {/* Desktop sidebar — always visible */}
+        <aside className="hidden lg:flex flex-col w-64 flex-shrink-0 sticky top-0 h-screen"
+          style={{ background: T.sidebar, borderRight: `1px solid ${T.border}` }}>
+          <SidebarContent tab={tab} setTab={setTab} onBack={onBack} />
+        </aside>
+      </>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+
+        {/* Topbar */}
+        <header className="sticky top-0 z-20 flex items-center gap-3 px-5 py-4"
+          style={{ background: `${T.bg}ee`, borderBottom: `1px solid ${T.border}`, backdropFilter: 'blur(12px)' }}>
+          <button type="button" onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 rounded-xl" style={{ color: T.muted, background: T.surface }}>
+            <Menu size={18} />
           </button>
-        ))}
-      </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <current.icon size={16} style={{ color: T.accent, flexShrink: 0 }} />
+            <h1 className="text-base font-semibold truncate" style={{ color: T.text }}>{current.label}</h1>
+          </div>
+          <div className="ml-auto hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full"
+            style={{ background: T.accentBg, color: T.accent, border: `1px solid ${T.accentBorder}` }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
+            Admin
+          </div>
+        </header>
 
-      {tab === 'stats' && <StatsTab />}
-      {tab === 'config' && <ConfigTab section="identity" />}
-      {tab === 'voice' && <ConfigTab section="voice" />}
-      {tab === 'google' && <ConfigTab section="google" />}
-      {tab === 'flutterwave' && <ConfigTab section="flutterwave" />}
-      {tab === 'security' && <ConfigTab section="security" />}
-      {tab === 'plans' && <PlansTab />}
-      {tab === 'users' && <UsersTab />}
+        {/* Page body */}
+        <main className="flex-1 px-5 py-6 overflow-y-auto" style={{ maxWidth: 720 }}>
+          <AnimatePresence mode="wait">
+            <motion.div key={tab}
+              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.18 }}>
+              {tab === 'overview'  && <OverviewTab />}
+              {tab === 'site'      && <ConfigTab section="identity" />}
+              {tab === 'voice'     && <ConfigTab section="voice" />}
+              {tab === 'google'    && <ConfigTab section="google" />}
+              {tab === 'payments'  && <ConfigTab section="flutterwave" />}
+              {tab === 'security'  && <ConfigTab section="security" />}
+              {tab === 'plans'     && <PlansTab />}
+              {tab === 'users'     && <UsersTab />}
+            </motion.div>
+          </AnimatePresence>
+        </main>
+      </div>
     </div>
   )
 }
 
-// ── Stats ─────────────────────────────────────────────────────────────────────
-function StatsTab() {
+// ── Sidebar content ───────────────────────────────────────────────────────────
+function SidebarContent({ tab, setTab, onBack }: { tab: Tab; setTab: (t: Tab) => void; onBack: () => void }) {
+  return (
+    <div className="flex flex-col h-full">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-5 py-5" style={{ borderBottom: `1px solid ${T.border}` }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg,#20d2a0,#0ea882)' }}>
+          <AudioWaveform size={16} style={{ color: '#0a121e' }} />
+        </div>
+        <div>
+          <div className="text-sm font-bold" style={{ color: T.text, letterSpacing: '-0.01em' }}>Voicera</div>
+          <div className="text-xs" style={{ color: T.dim }}>Admin Console</div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
+        {GROUPS.map(group => (
+          <div key={group}>
+            <div className="px-2 mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: T.dim }}>
+              {group}
+            </div>
+            <div className="space-y-0.5">
+              {NAV.filter(n => n.group === group).map(item => {
+                const active = tab === item.id
+                return (
+                  <button key={item.id} type="button" onClick={() => setTab(item.id)}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left"
+                    style={active
+                      ? { background: T.accentBg, color: T.accent, border: `1px solid ${T.accentBorder}` }
+                      : { color: T.muted, border: '1px solid transparent' }}>
+                    <item.icon size={15} />
+                    {item.label}
+                    {active && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: T.accent }} />}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Back to studio */}
+      <div className="px-3 py-4" style={{ borderTop: `1px solid ${T.border}` }}>
+        <button type="button" onClick={onBack}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all"
+          style={{ color: T.muted, border: `1px solid ${T.border}`, background: T.surface }}>
+          <ArrowLeft size={14} />
+          Back to Studio
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+function OverviewTab() {
   const [stats, setStats] = useState<AdminStats | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -77,31 +200,75 @@ function StatsTab() {
   if (loading) return <Spinner />
   if (!stats) return null
 
+  const metricCards = [
+    { label: 'Total Users', value: stats.totalUsers, icon: Users, color: T.accent },
+    ...stats.plans.map(p => ({
+      label: `${p.name} Plan`,
+      value: stats.planCounts[p.id] ?? 0,
+      icon: p.id === 'free' ? UserCheck : p.id === 'pro' ? Zap : TrendingUp,
+      color: p.id === 'enterprise' ? '#a78bfa' : p.id === 'pro' ? T.accent : T.muted,
+    })),
+  ]
+
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard label="Total Users" value={stats.totalUsers} />
-        {stats.plans.map(p => (
-          <StatCard key={p.id} label={`${p.name} Users`} value={stats.planCounts[p.id] ?? 0} />
+    <div className="space-y-6">
+      <PageHeader title="Overview" subtitle="Platform metrics and health" />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {metricCards.map((m, i) => (
+          <motion.div key={i} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="rounded-2xl p-4 space-y-3"
+            style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: T.muted }}>{m.label}</span>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: `${m.color}18` }}>
+                <m.icon size={13} style={{ color: m.color }} />
+              </div>
+            </div>
+            <div className="text-3xl font-bold tabular-nums" style={{ color: m.color, letterSpacing: '-0.03em' }}>
+              {m.value.toLocaleString()}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Quick links */}
+      <div className="rounded-2xl p-5 space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <div className="text-sm font-semibold" style={{ color: T.text }}>Quick Setup Checklist</div>
+        {[
+          { label: 'Configure Voice API key', tab: 'voice' as Tab },
+          { label: 'Set up payment plans', tab: 'plans' as Tab },
+          { label: 'Enable Google login', tab: 'google' as Tab },
+        ].map(item => (
+          <div key={item.label} className="flex items-center gap-3 py-2 border-b last:border-0"
+            style={{ borderColor: T.border }}>
+            <AlertTriangle size={13} style={{ color: '#f59e0b', flexShrink: 0 }} />
+            <span className="text-sm flex-1" style={{ color: T.muted }}>{item.label}</span>
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-      <div className="text-2xl font-bold tabular-nums display mb-1" style={{ color: '#20d2a0' }}>{value.toLocaleString()}</div>
-      <div className="text-xs" style={{ color: 'rgba(240,250,247,0.5)' }}>{label}</div>
-    </div>
-  )
-}
-
-// ── Config (multi-section) ────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 type ConfigSection = 'identity' | 'voice' | 'google' | 'flutterwave' | 'security'
 
+const CONFIG_TITLES: Record<ConfigSection, { title: string; subtitle: string }> = {
+  identity:    { title: 'Site Identity', subtitle: 'Brand name, logo, and appearance' },
+  voice:       { title: 'Voice API', subtitle: 'OpenRouter API key and model' },
+  google:      { title: 'Google OAuth', subtitle: 'Google login credentials' },
+  flutterwave: { title: 'Payments', subtitle: 'Flutterwave keys and webhook' },
+  security:    { title: 'Security', subtitle: 'JWT secret and admin email' },
+}
+
 function ConfigTab({ section }: { section: ConfigSection }) {
+  return <ConfigTabInner key={section} section={section} />
+}
+
+function ConfigTabInner({ section }: { section: ConfigSection }) {
   const [cfg, setCfg] = useState<FullSiteConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -110,8 +277,13 @@ function ConfigTab({ section }: { section: ConfigSection }) {
   const [show, setShow] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
-    adminGetConfig().then(setCfg).catch(console.error).finally(() => setLoading(false))
-  }, [section])
+    let cancelled = false
+    adminGetConfig()
+      .then(c => { if (!cancelled) setCfg(c) })
+      .catch(console.error)
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
 
   const toggleShow = (k: string) => setShow(s => ({ ...s, [k]: !s[k] }))
 
@@ -130,131 +302,104 @@ function ConfigTab({ section }: { section: ConfigSection }) {
 
   if (loading || !cfg) return <Spinner />
 
-  const secretInputProps = { cfg, setCfg, show, toggleShow }
+  const sp = { cfg, setCfg, show, toggleShow }
+  const { title, subtitle } = CONFIG_TITLES[section]
 
   return (
-    <form onSubmit={e => { void handleSave(e) }} className="space-y-4">
+    <form onSubmit={e => { void handleSave(e) }} className="space-y-5">
+      <PageHeader title={title} subtitle={subtitle} />
 
       {section === 'identity' && <>
-        <SectionCard title="Site Identity" icon={<Globe size={14} />}>
-          <AdminInput label="Site Name" value={cfg.siteName} onChange={v => setCfg({ ...cfg, siteName: v })} />
-          <AdminInput label="Tagline" value={cfg.tagline} onChange={v => setCfg({ ...cfg, tagline: v })} />
-          <AdminInput label="Logo URL" value={cfg.logoUrl} onChange={v => setCfg({ ...cfg, logoUrl: v })} placeholder="https://..." />
-          <AdminInput label="Support Email" value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} />
-          {cfg.logoUrl && <img src={cfg.logoUrl} alt="logo preview" className="h-12 mt-2 rounded-lg object-contain" style={{ background: 'rgba(255,255,255,0.05)', padding: 4 }} />}
-        </SectionCard>
-        <SectionCard title="Appearance" icon={<Palette size={14} />}>
-          <div className="flex items-center gap-3">
-            <AdminInput label="Brand Color (hex)" value={cfg.primaryColor} onChange={v => setCfg({ ...cfg, primaryColor: v })} />
-            <div className="w-8 h-8 rounded-lg mt-5 flex-shrink-0" style={{ background: cfg.primaryColor, border: '1px solid rgba(255,255,255,0.1)' }} />
-          </div>
-        </SectionCard>
-        <SectionCard title="System" icon={<Settings size={14} />}>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div onClick={() => setCfg({ ...cfg, maintenanceMode: !cfg.maintenanceMode })}
-              className="w-10 h-5 rounded-full relative transition-colors flex-shrink-0"
-              style={{ background: cfg.maintenanceMode ? '#20d2a0' : 'rgba(255,255,255,0.1)' }}>
-              <div className="w-4 h-4 rounded-full absolute top-0.5 transition-transform"
-                style={{ background: '#fff', left: cfg.maintenanceMode ? '22px' : '2px' }} />
+        <Card>
+          <CardTitle icon={<Globe size={14} />} title="Brand" />
+          <Field label="Site Name"><AInput value={cfg.siteName} onChange={v => setCfg({ ...cfg, siteName: v })} /></Field>
+          <Field label="Tagline"><AInput value={cfg.tagline} onChange={v => setCfg({ ...cfg, tagline: v })} /></Field>
+          <Field label="Logo URL"><AInput value={cfg.logoUrl} onChange={v => setCfg({ ...cfg, logoUrl: v })} placeholder="https://..." /></Field>
+          <Field label="Support Email"><AInput value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} /></Field>
+          {cfg.logoUrl && (
+            <div className="pt-2">
+              <img src={cfg.logoUrl} alt="logo preview" className="h-10 rounded-xl object-contain"
+                style={{ background: 'rgba(255,255,255,0.05)', padding: 6 }} />
             </div>
-            <span className="text-sm" style={{ color: 'rgba(240,250,247,0.7)' }}>Maintenance Mode (locks non-admin access)</span>
-          </label>
-        </SectionCard>
+          )}
+        </Card>
+        <Card>
+          <CardTitle icon={<Palette size={14} />} title="Appearance" />
+          <Field label="Brand Color">
+            <div className="flex items-center gap-3">
+              <div className="flex-1"><AInput value={cfg.primaryColor} onChange={v => setCfg({ ...cfg, primaryColor: v })} placeholder="#20d2a0" /></div>
+              <div className="w-9 h-9 rounded-xl flex-shrink-0 mt-1" style={{ background: cfg.primaryColor, border: `1px solid ${T.border}` }} />
+            </div>
+          </Field>
+        </Card>
+        <Card>
+          <CardTitle icon={<Settings size={14} />} title="System" />
+          <button type="button" onClick={() => setCfg({ ...cfg, maintenanceMode: !cfg.maintenanceMode })}
+            className="flex items-center justify-between w-full py-1">
+            <span className="text-sm" style={{ color: T.muted }}>Maintenance Mode</span>
+            <Toggle on={cfg.maintenanceMode} />
+          </button>
+          <p className="text-xs" style={{ color: T.dim }}>Locks the studio for non-admin users while you make changes.</p>
+        </Card>
       </>}
 
       {section === 'voice' && <>
-        <InfoBanner icon={<Key size={13} />} text="Your OpenRouter API key is stored encrypted in Cloudflare KV — never exposed to users." />
-        <SectionCard title="Voice Engine — OpenRouter" icon={<Key size={14} />}>
-          <SecretField label="OpenRouter API Key" field="openrouterApiKey" placeholder="sk-or-v1-..." {...secretInputProps} />
-          <AdminInput label="Model ID" value={cfg.openrouterModel} onChange={v => setCfg({ ...cfg, openrouterModel: v })} placeholder="fish-audio/s2.1-pro-free:free" />
-          <div className="text-xs px-1 pt-1" style={{ color: 'rgba(240,250,247,0.35)' }}>
-            Find model IDs at <span style={{ color: '#20d2a0' }}>openrouter.ai/models</span> — search "fish-audio" or "tts"
-          </div>
-        </SectionCard>
+        <InfoBanner icon={<Key size={13} />} text="Your OpenRouter API key is stored in Cloudflare KV and never exposed to users." />
+        <Card>
+          <CardTitle icon={<AudioWaveform size={14} />} title="OpenRouter" />
+          <Field label="API Key"><SField field="openrouterApiKey" placeholder="sk-or-v1-..." {...sp} /></Field>
+          <Field label="Model ID"><AInput value={cfg.openrouterModel} onChange={v => setCfg({ ...cfg, openrouterModel: v })} placeholder="fish-audio/s2.1-pro-free:free" /></Field>
+          <p className="text-xs mt-1" style={{ color: T.dim }}>Find model IDs at <span style={{ color: T.accent }}>openrouter.ai/models</span> — search "fish-audio"</p>
+        </Card>
       </>}
 
       {section === 'google' && <>
-        <InfoBanner icon={<Settings size={13} />} text="Set Authorised redirect URI in Google Console to the value shown below." />
-        <SectionCard title="Google OAuth" icon={<Settings size={14} />}>
-          <AdminInput label="Google Client ID" value={cfg.googleClientId} onChange={v => setCfg({ ...cfg, googleClientId: v })} placeholder="123456789-xxx.apps.googleusercontent.com" />
-          <SecretField label="Google Client Secret" field="googleClientSecret" placeholder="GOCSPX-..." {...secretInputProps} />
-          <AdminInput label="Redirect URI" value={cfg.googleRedirectUri} onChange={v => setCfg({ ...cfg, googleRedirectUri: v })} placeholder="https://voicera-api.YOUR-NAME.workers.dev/api/auth/google/callback" />
-          <div className="text-xs rounded-xl px-3 py-2 font-mono" style={{ background: 'rgba(32,210,160,0.06)', color: 'rgba(240,250,247,0.5)', wordBreak: 'break-all' }}>
-            {cfg.googleRedirectUri || 'Set Redirect URI above, then paste it in Google Console → Authorised redirect URIs'}
-          </div>
-        </SectionCard>
+        <InfoBanner icon={<Chrome size={13} />} text={`Set Authorised redirect URI in Google Console to: https://voicera.pages.dev/api/auth/google/callback`} />
+        <Card>
+          <CardTitle icon={<Chrome size={14} />} title="OAuth 2.0 Credentials" />
+          <Field label="Client ID"><AInput value={cfg.googleClientId} onChange={v => setCfg({ ...cfg, googleClientId: v })} placeholder="123456789-xxx.apps.googleusercontent.com" /></Field>
+          <Field label="Client Secret"><SField field="googleClientSecret" placeholder="GOCSPX-..." {...sp} /></Field>
+          <Field label="Redirect URI"><AInput value={cfg.googleRedirectUri} onChange={v => setCfg({ ...cfg, googleRedirectUri: v })} placeholder="https://voicera.pages.dev/api/auth/google/callback" /></Field>
+          {cfg.googleRedirectUri && (
+            <div className="text-xs font-mono px-3 py-2 rounded-xl break-all" style={{ background: 'rgba(32,210,160,0.06)', color: T.muted }}>
+              {cfg.googleRedirectUri}
+            </div>
+          )}
+        </Card>
       </>}
 
       {section === 'flutterwave' && <>
-        <InfoBanner icon={<Banknote size={13} />} text="Set your Flutterwave webhook URL to: https://voicera-api.YOUR-NAME.workers.dev/api/payment/webhook" />
-        <SectionCard title="Flutterwave Payments" icon={<Banknote size={14} />}>
-          <AdminInput label="Public Key" value={cfg.flutterwavePublicKey} onChange={v => setCfg({ ...cfg, flutterwavePublicKey: v })} placeholder="FLWPUBK-..." />
-          <SecretField label="Secret Key" field="flutterwaveSecretKey" placeholder="FLWSECK-..." {...secretInputProps} />
-          <SecretField label="Encryption Key" field="flutterwaveEncryptionKey" placeholder="..." {...secretInputProps} />
-          <SecretField label="Webhook Hash / Secret" field="flutterwaveWebhookHash" placeholder="Your webhook secret hash" {...secretInputProps} />
-          <div className="text-xs px-1" style={{ color: 'rgba(240,250,247,0.35)' }}>
-            Find these in Flutterwave Dashboard → Settings → API Keys &amp; Webhooks
-          </div>
-        </SectionCard>
+        <InfoBanner icon={<Banknote size={13} />} text="Webhook URL: https://voicera.pages.dev/api/payment/webhook" />
+        <Card>
+          <CardTitle icon={<Banknote size={14} />} title="Flutterwave Keys" />
+          <Field label="Public Key"><AInput value={cfg.flutterwavePublicKey} onChange={v => setCfg({ ...cfg, flutterwavePublicKey: v })} placeholder="FLWPUBK-..." /></Field>
+          <Field label="Secret Key"><SField field="flutterwaveSecretKey" placeholder="FLWSECK-..." {...sp} /></Field>
+          <Field label="Encryption Key"><SField field="flutterwaveEncryptionKey" placeholder="..." {...sp} /></Field>
+          <Field label="Webhook Hash"><SField field="flutterwaveWebhookHash" placeholder="Your webhook secret hash" {...sp} /></Field>
+          <p className="text-xs" style={{ color: T.dim }}>Flutterwave Dashboard → Settings → API Keys &amp; Webhooks</p>
+        </Card>
       </>}
 
       {section === 'security' && <>
-        <InfoBanner icon={<ShieldCheck size={13} />} text="Rotating the JWT secret invalidates ALL active sessions — users will need to log in again." />
-        <SectionCard title="JWT Secret" icon={<ShieldCheck size={14} />}>
-          <SecretField label="JWT Secret (signs all tokens)" field="jwtSecret" placeholder="Min 32 characters" {...secretInputProps} />
-          <AdminInput label="Admin Email (gets admin role on register)" value={cfg.adminEmail} type="email" onChange={v => setCfg({ ...cfg, adminEmail: v })} />
-        </SectionCard>
+        <InfoBanner icon={<AlertTriangle size={13} />} text="Rotating the JWT secret invalidates ALL active sessions — all users will need to log in again." variant="warn" />
+        <Card>
+          <CardTitle icon={<ShieldCheck size={14} />} title="Authentication" />
+          <Field label="JWT Secret"><SField field="jwtSecret" placeholder="Min 32 characters" {...sp} /></Field>
+          <Field label="Admin Email"><AInput value={cfg.adminEmail} type="email" onChange={v => setCfg({ ...cfg, adminEmail: v })} /></Field>
+          <p className="text-xs" style={{ color: T.dim }}>The admin email gets the admin role automatically on register.</p>
+        </Card>
       </>}
 
-      {error && <div className="text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(186,43,76,0.12)', color: '#ff6b8a' }}>{error}</div>}
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl px-4 py-3 text-sm"
+          style={{ background: T.redBg, color: T.red, border: `1px solid rgba(255,107,138,0.2)` }}>
+          <AlertTriangle size={14} />
+          {error}
+        </div>
+      )}
 
-      <button type="submit" disabled={saving}
-        className="w-full rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-        style={saving
-          ? { background: 'rgba(32,210,160,0.1)', color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
-          : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
-        {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <CheckCircle2 size={15} /> : <Save size={15} />}
-        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save'}
-      </button>
+      <SaveButton saving={saving} saved={saved} />
     </form>
-  )
-}
-
-interface SecretFieldProps {
-  label: string
-  field: keyof FullSiteConfig
-  placeholder?: string
-  cfg: FullSiteConfig
-  setCfg: (c: FullSiteConfig) => void
-  show: Record<string, boolean>
-  toggleShow: (k: string) => void
-}
-
-function SecretField({ label, field, placeholder, cfg, setCfg, show, toggleShow }: SecretFieldProps) {
-  return (
-    <div className="relative">
-      <AdminInput
-        label={label}
-        value={String(cfg[field] ?? '')}
-        type={show[field] ? 'text' : 'password'}
-        onChange={v => setCfg({ ...cfg, [field]: v })}
-        placeholder={placeholder}
-      />
-      <button type="button" onClick={() => toggleShow(field)}
-        className="absolute right-3 bottom-3"
-        style={{ color: 'rgba(240,250,247,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-        {show[field] ? <EyeOff size={13} /> : <Eye size={13} />}
-      </button>
-    </div>
-  )
-}
-
-function InfoBanner({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <div className="flex items-start gap-2 rounded-xl px-4 py-3" style={{ background: 'rgba(32,210,160,0.07)', border: '1px solid rgba(32,210,160,0.18)' }}>
-      <span style={{ color: '#20d2a0', flexShrink: 0, marginTop: 1 }}>{icon}</span>
-      <span className="text-xs" style={{ color: 'rgba(240,250,247,0.55)' }}>{text}</span>
-    </div>
   )
 }
 
@@ -270,81 +415,100 @@ function PlansTab() {
     adminGetPlans().then(setPlans).catch(console.error).finally(() => setLoading(false))
   }, [])
 
-  const updatePlan = useCallback((id: string, patch: Partial<Plan>) => {
-    setPlans(ps => ps.map(p => p.id === id ? { ...p, ...patch } : p))
-  }, [])
+  const update = useCallback((id: string, patch: Partial<Plan>) =>
+    setPlans(ps => ps.map(p => p.id === id ? { ...p, ...patch } : p)), [])
 
   async function handleSave() {
     setSaving(true); setSaved(false)
-    try {
-      await adminPutPlans(plans)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    } finally {
-      setSaving(false)
-    }
+    try { await adminPutPlans(plans); setSaved(true); setTimeout(() => setSaved(false), 2500) }
+    finally { setSaving(false) }
   }
 
   if (loading) return <Spinner />
 
   return (
-    <div className="space-y-3">
-      {plans.map(plan => (
-        <div key={plan.id} className="rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <button type="button" onClick={() => setExpanded(expanded === plan.id ? null : plan.id)}
-            className="w-full flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="text-sm font-bold" style={{ color: '#f0faf7' }}>{plan.name}</div>
-              <div className="text-xs tabular-nums px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(32,210,160,0.1)', color: '#20d2a0' }}>
-                {plan.tokensPerDay.toLocaleString()} chars/day
-              </div>
-              <div className="text-xs tabular-nums" style={{ color: 'rgba(240,250,247,0.5)' }}>
-                {plan.price === 0 ? 'Free' : `$${plan.price}/mo`}
-              </div>
-            </div>
-            {expanded === plan.id ? <ChevronUp size={14} style={{ color: 'rgba(240,250,247,0.4)' }} /> : <ChevronDown size={14} style={{ color: 'rgba(240,250,247,0.4)' }} />}
-          </button>
+    <div className="space-y-5">
+      <PageHeader title="Plans" subtitle="Configure token limits, pricing and features" />
 
-          {expanded === plan.id && (
-            <div className="px-4 pb-4 space-y-3 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-              <div className="grid grid-cols-2 gap-3 pt-3">
-                <AdminInput label="Plan Name" value={plan.name} onChange={v => updatePlan(plan.id, { name: v })} />
-                <AdminInput label="Price (USD/mo)" value={String(plan.price)} type="number" onChange={v => updatePlan(plan.id, { price: Number(v) })} />
-                <AdminInput label="Tokens / Day (chars)" value={String(plan.tokensPerDay)} type="number" onChange={v => updatePlan(plan.id, { tokensPerDay: Number(v) })} />
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs" style={{ color: 'rgba(240,250,247,0.45)' }}>Popular Badge</label>
-                  <button type="button" onClick={() => updatePlan(plan.id, { popular: !plan.popular })}
-                    className="flex items-center gap-2 text-xs py-2.5 px-3 rounded-xl border"
-                    style={plan.popular
-                      ? { background: 'rgba(32,210,160,0.12)', borderColor: 'rgba(32,210,160,0.35)', color: '#20d2a0' }
-                      : { background: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.08)', color: 'rgba(240,250,247,0.4)' }}>
-                    {plan.popular ? <CheckCircle2 size={12} /> : null} {plan.popular ? 'Popular' : 'Not Popular'}
-                  </button>
+      <div className="space-y-3">
+        {plans.map((plan, i) => (
+          <motion.div key={plan.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.04 }}
+            className="rounded-2xl overflow-hidden"
+            style={{ background: T.surface, border: `1px solid ${plan.popular ? T.accentBorder : T.border}` }}>
+
+            <button type="button" onClick={() => setExpanded(expanded === plan.id ? null : plan.id)}
+              className="w-full flex items-center gap-3 px-5 py-4">
+              {/* Plan badge */}
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: plan.popular ? T.accentBg : 'rgba(255,255,255,0.05)' }}>
+                <CreditCard size={14} style={{ color: plan.popular ? T.accent : T.muted }} />
+              </div>
+              <div className="flex-1 text-left min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold" style={{ color: T.text }}>{plan.name}</span>
+                  {plan.popular && (
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+                      style={{ background: T.accentBg, color: T.accent, border: `1px solid ${T.accentBorder}` }}>
+                      Popular
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-xs tabular-nums" style={{ color: T.accent }}>
+                    {plan.tokensPerDay.toLocaleString()} chars/day
+                  </span>
+                  <span className="text-xs" style={{ color: T.dim }}>
+                    {plan.price === 0 ? 'Free' : `$${plan.price}/mo`}
+                  </span>
                 </div>
               </div>
-              <div>
-                <label className="text-xs mb-1.5 block" style={{ color: 'rgba(240,250,247,0.45)' }}>Features (one per line)</label>
-                <textarea
-                  value={plan.features.join('\n')}
-                  onChange={e => updatePlan(plan.id, { features: e.target.value.split('\n').filter(Boolean) })}
-                  rows={4}
-                  className="w-full rounded-xl px-3 py-2.5 text-xs outline-none border resize-none"
-                  style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
+              {expanded === plan.id
+                ? <ChevronUp size={14} style={{ color: T.dim }} />
+                : <ChevronDown size={14} style={{ color: T.dim }} />}
+            </button>
 
-      <button type="button" onClick={() => { void handleSave() }} disabled={saving}
-        className="w-full rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-        style={saving ? { background: 'rgba(32,210,160,0.1)', color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
-          : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
-        {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <CheckCircle2 size={15} /> : <Save size={15} />}
-        {saved ? 'Saved!' : 'Save Plans'}
-      </button>
+            <AnimatePresence>
+              {expanded === plan.id && (
+                <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                  style={{ overflow: 'hidden', borderTop: `1px solid ${T.border}` }}>
+                  <div className="px-5 py-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Plan Name"><AInput value={plan.name} onChange={v => update(plan.id, { name: v })} /></Field>
+                      <Field label="Price ($/mo)"><AInput value={String(plan.price)} type="number" onChange={v => update(plan.id, { price: Number(v) })} /></Field>
+                      <Field label="Tokens / Day"><AInput value={String(plan.tokensPerDay)} type="number" onChange={v => update(plan.id, { tokensPerDay: Number(v) })} /></Field>
+                      <Field label="Popular Badge">
+                        <button type="button" onClick={() => update(plan.id, { popular: !plan.popular })}
+                          className="flex items-center gap-2 text-xs py-2.5 px-3 rounded-xl border w-full mt-1"
+                          style={plan.popular
+                            ? { background: T.accentBg, borderColor: T.accentBorder, color: T.accent }
+                            : { background: 'rgba(0,0,0,0.2)', borderColor: T.border, color: T.muted }}>
+                          {plan.popular && <CheckCircle2 size={12} />}
+                          {plan.popular ? 'Popular' : 'Mark as Popular'}
+                        </button>
+                      </Field>
+                    </div>
+                    <Field label="Features (one per line)">
+                      <textarea
+                        value={plan.features.join('\n')}
+                        onChange={e => update(plan.id, { features: e.target.value.split('\n').filter(Boolean) })}
+                        rows={4}
+                        className="w-full rounded-xl px-3 py-2.5 text-xs outline-none border resize-none"
+                        style={{ background: 'rgba(0,0,0,0.25)', borderColor: T.border, color: T.text, fontFamily: 'inherit' }}
+                        onFocus={e => { e.currentTarget.style.borderColor = T.accentBorder }}
+                        onBlur={e => { e.currentTarget.style.borderColor = T.border }}
+                      />
+                    </Field>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        ))}
+      </div>
+
+      <SaveButton saving={saving} saved={saved} onClick={() => { void handleSave() }} />
     </div>
   )
 }
@@ -365,9 +529,7 @@ function UsersTab() {
     try {
       const updated = await adminPatchUser(user.id, { plan })
       setUsers(us => us.map(u => u.id === user.id ? updated : u))
-    } finally {
-      setUpdating(null)
-    }
+    } finally { setUpdating(null) }
   }
 
   async function handleRoleChange(user: AuthUser, role: string) {
@@ -375,115 +537,217 @@ function UsersTab() {
     try {
       const updated = await adminPatchUser(user.id, { role })
       setUsers(us => us.map(u => u.id === user.id ? updated : u))
-    } finally {
-      setUpdating(null)
-    }
+    } finally { setUpdating(null) }
   }
 
   const PLANS = ['free', 'starter', 'pro', 'enterprise']
-  const filtered = users.filter(u => u.email.includes(search) || u.name.toLowerCase().includes(search.toLowerCase()))
+  const filtered = users.filter(u =>
+    u.email.includes(search) || u.name.toLowerCase().includes(search.toLowerCase()))
 
   if (loading) return <Spinner />
 
   return (
-    <div className="space-y-3">
-      <input
-        type="text"
-        placeholder="Search by name or email…"
-        value={search}
-        onChange={e => setSearch(e.target.value)}
-        className="w-full rounded-xl px-4 py-2.5 text-sm outline-none border"
-        style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }}
-      />
-      <div className="text-xs px-1" style={{ color: 'rgba(240,250,247,0.35)' }}>{filtered.length} users</div>
+    <div className="space-y-5">
+      <PageHeader title="Users" subtitle={`${users.length} registered accounts`} />
 
-      {filtered.map(user => (
-        <div key={user.id} className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2 min-w-0">
+      {/* Search */}
+      <div className="relative">
+        <input type="text" placeholder="Search by name or email…"
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="w-full rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none border"
+          style={{ background: T.surface, borderColor: T.border, color: T.text, fontFamily: 'inherit' }}
+          onFocus={e => { e.currentTarget.style.borderColor = T.accentBorder }}
+          onBlur={e => { e.currentTarget.style.borderColor = T.border }}
+        />
+        <Users size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: T.dim }} />
+      </div>
+
+      <div className="space-y-2">
+        {filtered.map((user, i) => (
+          <motion.div key={user.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.03 }}
+            className="rounded-2xl p-4"
+            style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+
+            <div className="flex items-center gap-3 mb-3">
               {user.avatar
-                ? <img src={user.avatar} alt="" className="w-8 h-8 rounded-full flex-shrink-0" />
-                : <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold"
-                    style={{ background: 'rgba(32,210,160,0.15)', color: '#20d2a0' }}>
+                ? <img src={user.avatar} alt="" className="w-9 h-9 rounded-full flex-shrink-0 object-cover" />
+                : <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-sm font-bold"
+                    style={{ background: T.accentBg, color: T.accent }}>
                     {user.name.charAt(0).toUpperCase()}
                   </div>}
-              <div className="min-w-0">
-                <div className="text-sm font-medium truncate" style={{ color: '#f0faf7' }}>{user.name}</div>
-                <div className="text-xs truncate" style={{ color: 'rgba(240,250,247,0.4)' }}>{user.email}</div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate" style={{ color: T.text }}>{user.name}</div>
+                <div className="text-xs truncate" style={{ color: T.dim }}>{user.email}</div>
+              </div>
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                <span className="text-xs px-2 py-0.5 rounded-full"
+                  style={{ background: user.role === 'admin' ? T.accentBg : 'rgba(255,255,255,0.06)', color: user.role === 'admin' ? T.accent : T.muted }}>
+                  {user.role}
+                </span>
+                <span className="text-xs" style={{ color: T.dim }}>
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </span>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              <span className="text-xs px-2 py-0.5 rounded-full"
-                style={{ background: user.role === 'admin' ? 'rgba(32,210,160,0.15)' : 'rgba(255,255,255,0.06)', color: user.role === 'admin' ? '#20d2a0' : 'rgba(240,250,247,0.5)' }}>
-                {user.role}
-              </span>
-              <span className="text-xs" style={{ color: 'rgba(240,250,247,0.35)' }}>
-                {new Date(user.createdAt).toLocaleDateString()}
-              </span>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs block mb-1" style={{ color: 'rgba(240,250,247,0.4)' }}>Plan</label>
-              <select value={user.plan} onChange={e => { void handlePlanChange(user, e.target.value) }}
-                disabled={updating === user.id}
-                className="w-full rounded-lg px-2 py-1.5 text-xs outline-none border"
-                style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }}>
-                {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs block mb-1" style={{ color: T.dim }}>Plan</label>
+                <select value={user.plan} onChange={e => { void handlePlanChange(user, e.target.value) }}
+                  disabled={updating === user.id}
+                  className="w-full rounded-lg px-2 py-1.5 text-xs outline-none border"
+                  style={{ background: 'rgba(0,0,0,0.3)', borderColor: T.border, color: T.text, fontFamily: 'inherit' }}>
+                  {PLANS.map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs block mb-1" style={{ color: T.dim }}>Role</label>
+                <select value={user.role} onChange={e => { void handleRoleChange(user, e.target.value) }}
+                  disabled={updating === user.id}
+                  className="w-full rounded-lg px-2 py-1.5 text-xs outline-none border"
+                  style={{ background: 'rgba(0,0,0,0.3)', borderColor: T.border, color: T.text, fontFamily: 'inherit' }}>
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="text-xs block mb-1" style={{ color: 'rgba(240,250,247,0.4)' }}>Role</label>
-              <select value={user.role} onChange={e => { void handleRoleChange(user, e.target.value) }}
-                disabled={updating === user.id}
-                className="w-full rounded-lg px-2 py-1.5 text-xs outline-none border"
-                style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }}>
-                <option value="user">user</option>
-                <option value="admin">admin</option>
-              </select>
-            </div>
-          </div>
-          {updating === user.id && <div className="text-xs mt-2 flex items-center gap-1" style={{ color: '#20d2a0' }}><Loader2 size={10} className="animate-spin" /> Saving…</div>}
-        </div>
-      ))}
+
+            {updating === user.id && (
+              <div className="text-xs mt-2 flex items-center gap-1.5" style={{ color: T.accent }}>
+                <Loader2 size={10} className="animate-spin" /> Saving…
+              </div>
+            )}
+          </motion.div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center py-12 text-sm" style={{ color: T.dim }}>No users match your search.</div>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
-function SectionCard({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-      <div className="flex items-center gap-2 mb-4">
-        <span style={{ color: '#20d2a0' }}>{icon}</span>
-        <span className="text-sm font-semibold display" style={{ color: '#f0faf7' }}>{title}</span>
-      </div>
-      <div className="space-y-3">{children}</div>
+    <div className="mb-2">
+      <h2 className="text-xl font-bold" style={{ color: T.text, letterSpacing: '-0.02em' }}>{title}</h2>
+      <p className="text-sm mt-0.5" style={{ color: T.muted }}>{subtitle}</p>
     </div>
   )
 }
 
-function AdminInput({ label, value, onChange, type = 'text', placeholder }: {
-  label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string
+function Card({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl p-5 space-y-4" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+      {children}
+    </div>
+  )
+}
+
+function CardTitle({ icon, title }: { icon: React.ReactNode; title: string }) {
+  return (
+    <div className="flex items-center gap-2 pb-1" style={{ borderBottom: `1px solid ${T.border}` }}>
+      <span style={{ color: T.accent }}>{icon}</span>
+      <span className="text-sm font-semibold" style={{ color: T.text }}>{title}</span>
+    </div>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium" style={{ color: T.muted }}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function AInput({ value, onChange, type = 'text', placeholder }: {
+  value: string; onChange: (v: string) => void; type?: string; placeholder?: string
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-xs" style={{ color: 'rgba(240,250,247,0.45)' }}>{label}</label>
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      className="w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-all"
+      style={{ background: 'rgba(0,0,0,0.25)', borderColor: T.border, color: T.text, fontFamily: 'inherit' }}
+      onFocus={e => { e.currentTarget.style.borderColor = T.accentBorder }}
+      onBlur={e => { e.currentTarget.style.borderColor = T.border }}
+    />
+  )
+}
+
+interface SFieldProps {
+  field: keyof FullSiteConfig; placeholder?: string
+  cfg: FullSiteConfig; setCfg: (c: FullSiteConfig) => void
+  show: Record<string, boolean>; toggleShow: (k: string) => void
+}
+
+function SField({ field, placeholder, cfg, setCfg, show, toggleShow }: SFieldProps) {
+  return (
+    <div className="relative">
       <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
+        type={show[field] ? 'text' : 'password'}
+        value={String(cfg[field] ?? '')}
+        onChange={e => setCfg({ ...cfg, [field]: e.target.value })}
         placeholder={placeholder}
-        className="w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-colors"
-        style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }}
-        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(32,210,160,0.4)' }}
-        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+        className="w-full rounded-xl px-3 py-2.5 pr-10 text-sm outline-none border transition-all"
+        style={{ background: 'rgba(0,0,0,0.25)', borderColor: T.border, color: T.text, fontFamily: 'inherit' }}
+        onFocus={e => { e.currentTarget.style.borderColor = T.accentBorder }}
+        onBlur={e => { e.currentTarget.style.borderColor = T.border }}
       />
+      <button type="button" onClick={() => toggleShow(field)}
+        className="absolute right-3 top-1/2 -translate-y-1/2"
+        style={{ color: T.dim, background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+        {show[field] ? <EyeOff size={14} /> : <Eye size={14} />}
+      </button>
     </div>
+  )
+}
+
+function Toggle({ on }: { on: boolean }) {
+  return (
+    <div className="w-11 h-6 rounded-full relative flex-shrink-0 transition-colors"
+      style={{ background: on ? T.accent : 'rgba(255,255,255,0.1)' }}>
+      <motion.div animate={{ x: on ? 22 : 2 }} transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        className="absolute top-1 w-4 h-4 rounded-full" style={{ background: '#fff' }} />
+    </div>
+  )
+}
+
+function InfoBanner({ icon, text, variant = 'info' }: { icon: React.ReactNode; text: string; variant?: 'info' | 'warn' }) {
+  const c = variant === 'warn' ? { bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', color: '#f59e0b' }
+    : { bg: T.accentBg, border: T.accentBorder, color: T.accent }
+  return (
+    <div className="flex items-start gap-3 rounded-xl px-4 py-3"
+      style={{ background: c.bg, border: `1px solid ${c.border}` }}>
+      <span style={{ color: c.color, flexShrink: 0, marginTop: 1 }}>{icon}</span>
+      <span className="text-xs leading-relaxed" style={{ color: T.muted }}>{text}</span>
+    </div>
+  )
+}
+
+function SaveButton({ saving, saved, onClick }: { saving: boolean; saved: boolean; onClick?: () => void }) {
+  return (
+    <button type={onClick ? 'button' : 'submit'} onClick={onClick} disabled={saving}
+      className="w-full rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all"
+      style={saving
+        ? { background: T.accentBg, color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
+        : saved
+          ? { background: 'rgba(32,210,160,0.12)', color: T.accent, border: `1px solid ${T.accentBorder}` }
+          : { background: 'linear-gradient(135deg,#20d2a0 0%,#0ea882 100%)', color: '#0a121e' }}>
+      {saving ? <Loader2 size={15} className="animate-spin" />
+        : saved ? <CheckCircle2 size={15} />
+          : <Save size={15} />}
+      {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Changes'}
+    </button>
   )
 }
 
 function Spinner() {
-  return <div className="flex justify-center py-12"><Loader2 size={24} className="animate-spin" style={{ color: '#20d2a0' }} /></div>
+  return (
+    <div className="flex justify-center py-16">
+      <Loader2 size={24} className="animate-spin" style={{ color: T.accent }} />
+    </div>
+  )
 }
