@@ -137,6 +137,7 @@ export interface FullSiteConfig extends SiteConfig {
   flutterwaveSecretKey: string
   flutterwaveEncryptionKey: string
   flutterwaveWebhookHash: string
+  flutterwaveCurrency: string
   setupComplete: boolean
   updatedAt: number
 }

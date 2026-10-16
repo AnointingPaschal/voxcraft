@@ -24,6 +24,7 @@ export interface User {
   role: 'user' | 'admin'
   createdAt: number
   emailVerified: boolean
+  phone?: string
   flwCustomerId?: string
   subscriptionId?: string
   subscriptionExpiry?: number
@@ -61,6 +62,7 @@ export interface SiteConfig {
   flutterwaveSecretKey: string
   flutterwaveEncryptionKey: string
   flutterwaveWebhookHash: string
+  flutterwaveCurrency: string
   // ── System ──────────────────────────────────
   maintenanceMode: boolean
   setupComplete: boolean

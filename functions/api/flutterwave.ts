@@ -7,29 +7,46 @@ export async function initializePayment(
   const cfg = await getSiteConfig(env)
   if (!cfg.flutterwaveSecretKey) return { error: 'Payment not configured. Contact admin.' }
 
-  const txRef = `voxcraft-${user.id}-${Date.now()}`
+  const txRef = `voicera-${user.id}-${Date.now()}`
+
+  // Flutterwave minimum amount is 100 NGN / 1 USD — enforce a floor
+  const currency = cfg.flutterwaveCurrency || 'NGN'
+  const rawAmount = plan.price
+  const minAmount = currency === 'NGN' ? 100 : 1
+  const amount = Math.max(rawAmount, minAmount)
+
   const rec: PaymentRecord = {
     id: crypto.randomUUID(), userId: user.id, plan: plan.id,
-    amount: plan.price, currency: 'USD', status: 'pending',
+    amount, currency, status: 'pending',
     txRef, createdAt: Date.now(),
   }
   await putPayment(env, rec)
 
+  const payload = {
+    tx_ref: txRef,
+    amount,
+    currency,
+    redirect_url: redirectUrl,
+    customer: {
+      email: user.email,
+      name: user.name,
+      phonenumber: user.phone || '00000000000',
+    },
+    customizations: {
+      title: cfg.siteName || 'Voicera',
+      description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/day`,
+      ...(cfg.logoUrl ? { logo: cfg.logoUrl } : {}),
+    },
+    payment_options: 'card,banktransfer,ussd',
+    meta: { voicera_tx_ref: txRef, user_id: user.id, plan_id: plan.id },
+  }
+
+  console.log('[FLW] Sending payload:', JSON.stringify({ ...payload, customer: { ...payload.customer } }))
+
   const res = await fetch('https://api.flutterwave.com/v3/payments', {
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.flutterwaveSecretKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      tx_ref: txRef, amount: plan.price, currency: 'USD',
-      redirect_url: redirectUrl,
-      customer: { email: user.email, name: user.name },
-      customizations: {
-        title: cfg.siteName,
-        description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/day`,
-        logo: cfg.logoUrl || undefined,
-      },
-      payment_options: 'card,ussd,bank_transfer',
-      meta: { txRef, userId: user.id, plan: plan.id },
-    }),
+    body: JSON.stringify(payload),
   })
 
   if (!res.ok) {
