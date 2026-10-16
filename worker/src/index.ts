@@ -6,6 +6,7 @@ import { initializePayment, verifyAndActivate, handleWebhook } from './flutterwa
 // ── CORS helpers ──────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   'https://voicera.pages.dev',
+  'https://voicera.ozoemenapaschal09.workers.dev',
   'http://localhost:5173',
 ]
 
