@@ -1,574 +1,714 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Mic,
-  Upload,
-  Play,
-  Download,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  X,
-  ChevronDown,
+  Mic, Upload, FileText, Wand2, Play, Download, Loader2,
+  ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
+  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon,
 } from 'lucide-react'
-import { clsx } from 'clsx'
+import { toast } from 'sonner'
+import { useAuth } from './hooks/useAuth'
+import { synthesize, getUsage, type UsageData } from './lib/api'
+import AuthPage from './components/auth/AuthPage'
+import AdminPanel from './components/admin/AdminPanel'
+import PlansPage from './components/dashboard/PlansPage'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
+const ACCENT_OPTIONS = [
+  { label: 'Nigerian Pidgin', value: 'Nigerian Pidgin English accent, Naija street style' },
+  { label: 'Nigerian (Standard)', value: 'Nigerian Standard English accent, educated and clear' },
+  { label: 'Lagos Executive', value: 'Lagos professional English, polished Nigerian accent' },
+  { label: 'Ghanaian English', value: 'Ghanaian English accent, West African intonation' },
+  { label: 'Kenyan English', value: 'Kenyan English accent, East African intonation' },
+  { label: 'South African', value: 'South African English accent' },
+  { label: 'Jamaican Patois', value: 'Jamaican Patois accent and cadence' },
+  { label: 'British RP', value: 'British Received Pronunciation, crisp and clear' },
+  { label: 'American Midwest', value: 'American Midwest neutral accent' },
+  { label: 'Middle Eastern / Arabic', value: 'Middle Eastern English accent with Arabic inflection' },
+  { label: 'No accent hint', value: '' },
+]
 
-type Format = 'mp3' | 'wav'
-type Status = 'idle' | 'loading' | 'success' | 'error'
+const TIMBRE_OPTIONS = ['Male', 'Female', 'Auto / Match'] as const
+type Timbre = typeof TIMBRE_OPTIONS[number]
 
-interface AccentOption {
-  label: string
-  value: string
-  description: string
+const PERF_STYLES = [
+  'Natural & Conversational',
+  'Broadcast & Authoritative',
+  'Storytelling & Narrative',
+  'Energetic & Excited',
+  'Calm & Soothing',
+  'Documentary',
+  'Corporate & Professional',
+]
+
+const FORMAT_OPTIONS = [
+  { label: 'MP3 (Studio 44.1kHz)', value: 'mp3' },
+  { label: 'WAV (Lossless)', value: 'wav' },
+]
+
+const VOCAL_CUES = ['[laughing]', '[sigh]', '[excited]', '[whispering]', '[pause]', '[nervous]', '[crying]']
+
+const SCRIPT_TEMPLATES = [
+  { label: 'Pidgin Broadcast', text: 'How far my people! [laughing] Make una gather here sharp sharp. Dis new studio voice engine sabi speak better Naija Pidgin well well, everything clean without stress!' },
+  { label: 'Lagos Executive', text: 'Good morning, esteemed colleagues. Today, we present an innovative solution that will transform the African technology landscape and deliver measurable value to our stakeholders.' },
+  { label: 'Documentary', text: 'Across the vast savannahs of East Africa, ancient traditions meet the pulse of modern innovation. This is a story of resilience, culture, and the unbreakable human spirit.' },
+]
+
+const SYNTHESIS_STAGES = [
+  { label: 'Phonetics', desc: 'Parsing phonemes and stress patterns…' },
+  { label: 'Inflection', desc: 'Applying regional accent and tonal inflection…' },
+  { label: 'Synthesis', desc: 'Synthesizing neural voice output…' },
+  { label: 'Mastering', desc: 'Mastering audio for studio quality…' },
+]
+
+type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin'
+
+// ── App ───────────────────────────────────────────────────────────────────────
+export default function App() {
+  const { user, loading: authLoading, logout } = useAuth()
+  const [page, setPage] = useState<Page>('home')
+
+  // Handle Google OAuth callback
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const cbToken = params.get('token')
+    if (window.location.pathname === '/auth/callback' && cbToken) {
+      localStorage.setItem('vc_token', cbToken)
+      window.history.replaceState({}, '', '/')
+      window.location.reload()
+    }
+  }, [])
+
+  if (authLoading) return (
+    <div className="min-h-dvh flex items-center justify-center" style={{ background: '#0a121e' }}>
+      <Loader2 size={28} className="animate-spin" style={{ color: '#20d2a0' }} />
+    </div>
+  )
+
+  if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} />
+  if (page === 'plans') return (
+    <PageShell>
+      <PlansPage onBack={() => setPage('studio')} />
+    </PageShell>
+  )
+  if (page === 'admin' && user?.role === 'admin') return (
+    <PageShell>
+      <AdminPanel onBack={() => setPage('studio')} />
+    </PageShell>
+  )
+  if (page === 'studio') return (
+    <PageShell>
+      <StudioHeader user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} />
+      <StudioBody user={user} onSignIn={() => setPage('auth')} onPlans={() => setPage('plans')} />
+    </PageShell>
+  )
+  return <HomePage onEnter={() => setPage(user ? 'studio' : 'auth')} onSignIn={() => setPage('auth')} user={user} onStudio={() => setPage('studio')} />
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+function PageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-dvh" style={{ background: 'linear-gradient(160deg, #0a121e 0%, #0d1f2d 60%, #091824 100%)' }}>
+      {children}
+    </div>
+  )
+}
 
-const ACCENT_OPTIONS: AccentOption[] = [
-  { label: 'None', value: '', description: 'Default neutral voice' },
-  { label: 'Nigerian English', value: 'Speak with a warm Nigerian English accent', description: 'West African cadence' },
-  { label: 'Nigerian Pidgin', value: 'Speak in Nigerian Pidgin English, casual and expressive', description: 'Street-flavoured creole' },
-  { label: 'Ghanaian English', value: 'Speak with a Ghanaian English accent', description: 'Smooth Ghanaian lilt' },
-  { label: 'South African English', value: 'Speak with a South African English accent', description: 'SA vocal character' },
-  { label: 'Kenyan English', value: 'Speak with a Kenyan English accent', description: 'East African cadence' },
-  { label: 'Jamaican Patois', value: 'Speak in Jamaican Patois, rhythmic and vibrant', description: 'Caribbean rhythm' },
-  { label: 'British RP', value: 'Speak with a polished British Received Pronunciation accent', description: 'Classic British RP' },
-  { label: 'American Midwest', value: 'Speak with a clear American Midwest accent', description: 'Neutral US standard' },
-]
+// ── Home Page ─────────────────────────────────────────────────────────────────
+function HomePage({ onEnter, onSignIn, user, onStudio }: { onEnter: () => void; onSignIn: () => void; user: ReturnType<typeof useAuth>['user']; onStudio: () => void }) {
+  const features = [
+    { icon: Globe, title: '10+ African Accents', desc: 'Naija Pidgin, Lagos Executive, Ghanaian, Kenyan, South African and more.' },
+    { icon: Mic, title: 'Voice Print Cloning', desc: "Upload 5\u201315 seconds of audio to clone any speaker's vocal identity." },
+    { icon: Wand2, title: 'Vocal Cue System', desc: 'Insert [laughing], [whispering], [pause] and other emotional markers.' },
+    { icon: Zap, title: 'Studio Quality', desc: 'MP3 44.1kHz and lossless WAV output powered by Fish Audio S2.1 Pro.' },
+  ]
 
-const FORMAT_OPTIONS: { label: string; value: Format }[] = [
-  { label: 'MP3', value: 'mp3' },
-  { label: 'WAV', value: 'wav' },
-]
+  return (
+    <div className="min-h-dvh" style={{ background: 'linear-gradient(160deg, #0a121e 0%, #0d1f2d 60%, #091824 100%)' }}>
+      {/* Nav */}
+      <nav className="flex items-center justify-between px-5 py-4 max-w-3xl mx-auto">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)' }}>
+            <AudioWaveform size={16} color="#0a121e" strokeWidth={2.5} />
+          </div>
+          <span className="display font-bold text-base" style={{ color: '#f0faf7' }}>VoxCraft</span>
+          <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(32,210,160,0.12)', color: '#20d2a0', border: '1px solid rgba(32,210,160,0.25)' }}>Studio Pro</span>
+        </div>
+        <div className="flex items-center gap-2">
+          {user ? (
+            <button type="button" onClick={onStudio}
+              className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+              style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
+              Open Studio
+            </button>
+          ) : (
+            <button type="button" onClick={onSignIn}
+              className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', color: '#f0faf7', border: '1px solid rgba(255,255,255,0.1)' }}>
+              Sign In
+            </button>
+          )}
+        </div>
+      </nav>
 
-const MAX_CHARS = 3000
+      {/* Hero */}
+      <div className="max-w-2xl mx-auto px-5 pt-12 pb-8 text-center">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6 text-xs font-medium"
+            style={{ background: 'rgba(32,210,160,0.08)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+            <Sparkles size={11} />
+            Powered by Fish Audio S2.1 Pro
+          </div>
+          <h1 className="display text-4xl font-bold leading-tight mb-4" style={{ color: '#f0faf7', letterSpacing: '-0.03em' }}>
+            African Voice AI<br />
+            <span style={{ color: '#20d2a0' }}>Studio</span>
+          </h1>
+          <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'rgba(240,250,247,0.55)', lineHeight: 1.6 }}>
+            Generate studio-quality African-accented speech with voice cloning, vocal cues, and professional mastering.
+          </p>
+          <button type="button" onClick={onEnter}
+            className="px-8 py-4 rounded-2xl font-bold text-base flex items-center gap-2.5 mx-auto"
+            style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e', boxShadow: '0 0 32px rgba(32,210,160,0.25)' }}>
+            <AudioWaveform size={18} />
+            Launch Studio
+          </button>
+        </motion.div>
+      </div>
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+      {/* Features */}
+      <div className="max-w-2xl mx-auto px-5 pb-16">
+        <div className="grid grid-cols-2 gap-3">
+          {features.map((f, i) => (
+            <motion.div key={f.title}
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.07 }}
+              className="rounded-2xl p-4"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3"
+                style={{ background: 'rgba(32,210,160,0.1)' }}>
+                <f.icon size={15} style={{ color: '#20d2a0' }} />
+              </div>
+              <div className="text-sm font-semibold mb-1" style={{ color: '#f0faf7' }}>{f.title}</div>
+              <div className="text-xs leading-relaxed" style={{ color: 'rgba(240,250,247,0.45)' }}>{f.desc}</div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
-export default function App() {
+// ── Studio Header ─────────────────────────────────────────────────────────────
+function StudioHeader({ user, onLogout, onPlans, onAdmin }: {
+  user: ReturnType<typeof useAuth>['user']
+  onLogout: () => void
+  onPlans: () => void
+  onAdmin: () => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  return (
+    <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3"
+      style={{ background: 'rgba(10,18,30,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)' }}>
+      <div className="flex items-center gap-2.5">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)' }}>
+          <AudioWaveform size={16} color="#0a121e" strokeWidth={2.5} />
+        </div>
+        <span className="display font-bold text-sm" style={{ color: '#f0faf7' }}>VoxCraft</span>
+        <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(32,210,160,0.12)', color: '#20d2a0', border: '1px solid rgba(32,210,160,0.25)' }}>Studio Pro</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(240,250,247,0.5)' }}>
+          <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#20d2a0', boxShadow: '0 0 6px #20d2a0' }} />
+          Acoustic Engine Ready
+        </div>
+
+        {user ? (
+          <div className="relative">
+            <button type="button" onClick={() => setMenuOpen(v => !v)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#f0faf7' }}>
+              {user.avatar
+                ? <img src={user.avatar} alt="" className="w-5 h-5 rounded-full" />
+                : <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                    style={{ background: 'rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+                    {user.name.charAt(0)}
+                  </div>}
+              {user.name.split(' ')[0]}
+              <ChevronDown size={11} />
+            </button>
+            <AnimatePresence>
+              {menuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                  className="absolute right-0 top-full mt-2 w-48 rounded-2xl overflow-hidden py-1 z-50"
+                  style={{ background: '#0d1f2d', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+                  <div className="px-3 py-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+                    <div className="text-xs font-medium truncate" style={{ color: '#f0faf7' }}>{user.name}</div>
+                    <div className="text-xs truncate mt-0.5" style={{ color: 'rgba(240,250,247,0.4)' }}>{user.email}</div>
+                    <div className="text-xs mt-1 capitalize inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md"
+                      style={{ background: 'rgba(32,210,160,0.1)', color: '#20d2a0' }}>
+                      <Crown size={9} /> {user.plan}
+                    </div>
+                  </div>
+                  <MenuItem icon={<Crown size={13} />} label="Upgrade Plan" onClick={() => { setMenuOpen(false); onPlans() }} />
+                  {user.role === 'admin' && (
+                    <MenuItem icon={<ShieldCheck size={13} />} label="Admin Panel" onClick={() => { setMenuOpen(false); onAdmin() }} />
+                  )}
+                  <MenuItem icon={<LogOut size={13} />} label="Sign Out" onClick={() => { setMenuOpen(false); onLogout() }} danger />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ) : null}
+      </div>
+    </header>
+  )
+}
+
+function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+  return (
+    <button type="button" onClick={onClick}
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5"
+      style={{ color: danger ? '#ff6b8a' : 'rgba(240,250,247,0.7)' }}>
+      {icon}
+      {label}
+    </button>
+  )
+}
+
+// ── Studio Body ───────────────────────────────────────────────────────────────
+function StudioBody({ user, onSignIn, onPlans }: {
+  user: ReturnType<typeof useAuth>['user']
+  onSignIn: () => void
+  onPlans: () => void
+}) {
+  const [accent, setAccent] = useState(ACCENT_OPTIONS[0])
+  const [timbre, setTimbre] = useState<Timbre>('Male')
+  const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0])
+  const [pacing, setPacing] = useState(1.0)
+  const [format, setFormat] = useState('mp3')
   const [text, setText] = useState('')
-  const [accent, setAccent] = useState<AccentOption>(ACCENT_OPTIONS[0])
-  const [accentOpen, setAccentOpen] = useState(false)
-  const [format, setFormat] = useState<Format>('mp3')
+  const [referenceFile, setReferenceFile] = useState<File | null>(null)
   const [referenceDataUrl, setReferenceDataUrl] = useState<string | null>(null)
-  const [referenceFilename, setReferenceFilename] = useState<string | null>(null)
   const [referenceTranscript, setReferenceTranscript] = useState('')
-  const [status, setStatus] = useState<Status>('idle')
+  const [isRecording, setIsRecording] = useState(false)
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null)
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
-  const audioRef = useRef<HTMLAudioElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [stageIndex, setStageIndex] = useState(0)
+  const [stageProgress, setStageProgress] = useState(0)
+  const [elapsedMs, setElapsedMs] = useState(0)
+  const [usage, setUsage] = useState<UsageData | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const startTimeRef = useRef<number>(0)
 
-  // ── Reference audio upload ─────────────────────────────────────────────────
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (file.size > 15 * 1024 * 1024) {
-      setErrorMsg('Reference audio must be under 15 MB.')
-      return
+  // Load usage on mount / user change
+  useEffect(() => {
+    if (!user) return
+    getUsage().then(setUsage).catch(() => null)
+  }, [user])
+
+  const startProgressTimer = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - startTimeRef.current
+      setElapsedMs(elapsed)
+      const totalFake = 8000
+      const pct = Math.min((elapsed / totalFake) * 100, 95)
+      const stage = Math.min(Math.floor((pct / 100) * SYNTHESIS_STAGES.length), SYNTHESIS_STAGES.length - 1)
+      const stagePct = Math.min(((pct % (100 / SYNTHESIS_STAGES.length)) / (100 / SYNTHESIS_STAGES.length)) * 100, 99)
+      setStageIndex(stage)
+      setStageProgress(Math.round(stagePct))
+    }, 100)
+  }, [])
+
+  const stopProgressTimer = useCallback((success: boolean) => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (success) { setStageIndex(SYNTHESIS_STAGES.length - 1); setStageProgress(100) }
+  }, [])
+
+  const insertCue = useCallback((cue: string) => {
+    setText(prev => prev + cue + ' ')
+  }, [])
+
+  const loadTemplate = useCallback((t: typeof SCRIPT_TEMPLATES[number]) => {
+    setAccent(ACCENT_OPTIONS.find(a => a.label === t.label) ?? ACCENT_OPTIONS[0])
+    setText(t.text)
+  }, [])
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream)
+      const chunks: BlobPart[] = []
+      mr.ondataavailable = e => chunks.push(e.data)
+      mr.onstop = () => {
+        const blob = new Blob(chunks, { type: 'audio/webm' })
+        const file = new File([blob], 'recording.webm', { type: 'audio/webm' })
+        setReferenceFile(file)
+        const reader = new FileReader()
+        reader.onload = () => setReferenceDataUrl(reader.result as string)
+        reader.readAsDataURL(blob)
+        stream.getTracks().forEach(t => t.stop())
+      }
+      mr.start()
+      setMediaRecorder(mr)
+      setIsRecording(true)
+    } catch {
+      toast.error('Microphone access denied.')
     }
-    setReferenceFilename(file.name)
+  }
+
+  function stopRecording() {
+    mediaRecorder?.stop()
+    setIsRecording(false)
+    setMediaRecorder(null)
+  }
+
+  function handleFileUpload(file: File) {
+    if (file.size > 15 * 1024 * 1024) { toast.error('File must be under 15MB.'); return }
+    setReferenceFile(file)
     const reader = new FileReader()
-    reader.onload = () => {
-      setReferenceDataUrl(reader.result as string)
-    }
+    reader.onload = () => setReferenceDataUrl(reader.result as string)
     reader.readAsDataURL(file)
-  }, [])
+  }
 
-  const clearReference = useCallback(() => {
-    setReferenceDataUrl(null)
-    setReferenceFilename(null)
-    setReferenceTranscript('')
-    if (fileInputRef.current) fileInputRef.current.value = ''
-  }, [])
-
-  // ── Synthesize ─────────────────────────────────────────────────────────────
   const handleSynthesize = useCallback(async () => {
+    if (!user) { onSignIn(); return }
     if (!text.trim()) return
-    setStatus('loading')
-    setErrorMsg('')
-    setAudioUrl(null)
-    setAudioBlob(null)
+    setStageIndex(0); setStageProgress(0); setElapsedMs(0)
+    startTimeRef.current = Date.now()
+    setStatus('loading'); setErrorMsg(''); setAudioUrl(null); setAudioBlob(null)
+    startProgressTimer()
 
     try {
-      const body: Record<string, unknown> = {
+      const accentInstruction = [
+        accent.value,
+        timbre !== 'Auto / Match' ? `${timbre} voice.` : '',
+        perfStyle,
+        pacing !== 1.0 ? `Speaking pace: ${pacing}x.` : '',
+      ].filter(Boolean).join(' ')
+
+      const { blob, remaining } = await synthesize({
         text: text.trim(),
         format,
-      }
-      if (accent.value) body.accentInstruction = accent.value
-      if (referenceDataUrl) {
-        body.referenceAudioDataUrl = referenceDataUrl
-        if (referenceTranscript.trim()) body.referenceTranscript = referenceTranscript.trim()
-      }
-
-      const res = await fetch('/api/synthesize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        accentInstruction,
+        ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
 
-      if (!res.ok) {
-        const data: unknown = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-        throw new Error(
-          (typeof data === 'object' && data !== null && 'error' in data
-            ? (data as { error?: string }).error
-            : undefined) ?? `HTTP ${res.status}`,
-        )
-      }
-
-      const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setAudioBlob(blob)
+      stopProgressTimer(true)
       setStatus('success')
+      setUsage(prev => prev ? { ...prev, tokensUsed: prev.tokensUsed + text.trim().length, remaining } : prev)
+      toast.success('Audio synthesized!')
     } catch (err) {
+      stopProgressTimer(false)
       setStatus('error')
-      setErrorMsg(err instanceof Error ? err.message : 'Something went wrong.')
+      const msg = err instanceof Error ? err.message : 'Synthesis failed.'
+      setErrorMsg(msg)
+      if (msg.includes('limit') || msg.includes('quota')) onPlans()
     }
-  }, [text, format, accent, referenceDataUrl, referenceTranscript])
+  }, [user, text, format, accent, timbre, perfStyle, pacing, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
-  // ── Download ───────────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
-    if (!audioBlob || !audioUrl) return
+    if (!audioBlob) return
+    const url = audioUrl ?? URL.createObjectURL(audioBlob)
     const a = document.createElement('a')
-    a.href = audioUrl
-    a.download = `voxcraft-output.${format}`
-    a.click()
+    a.href = url; a.download = `voxcraft-output.${format}`; a.click()
   }, [audioBlob, audioUrl, format])
 
-  const charsLeft = MAX_CHARS - text.length
+  const charsUsed = text.length
+  const limitPct = usage ? Math.min((usage.tokensUsed / usage.limit) * 100, 100) : 0
 
   return (
-    <div
-      className="min-h-dvh w-full"
-      style={{ background: 'var(--bg-gradient)' }}
-    >
-      {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="w-full border-b" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
-        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: 'var(--accent)' }}
-          >
-            <Mic size={16} color="#fff" />
-          </div>
-          <div>
-            <h1 className="display text-base font-semibold leading-tight" style={{ color: 'var(--ink)' }}>
-              VoxCraft Studio
-            </h1>
-            <p className="text-xs" style={{ color: 'var(--subtle)' }}>
-              AI voice synthesis
-            </p>
-          </div>
-        </div>
-      </header>
-
-      {/* ── Body ───────────────────────────────────────────────────────── */}
-      <main className="max-w-2xl mx-auto px-4 py-8 flex flex-col gap-5">
-
-        {/* Script card */}
-        <section
-          className="rounded-2xl p-5 border backdrop-blur-sm"
-          style={{
-            background: 'var(--surface-strong)',
-            borderColor: 'var(--border)',
-          }}
-        >
-          <label
-            className="block text-xs font-semibold uppercase tracking-widest mb-2"
-            style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}
-          >
-            Script
-          </label>
-          <textarea
-            className="w-full rounded-xl px-4 py-3 text-sm resize-none outline-none border transition-colors"
-            style={{
-              background: 'var(--surface-muted)',
-              borderColor: 'var(--border)',
-              color: 'var(--ink)',
-              minHeight: '140px',
-              fontFamily: 'inherit',
-            }}
-            placeholder="Type or paste the text you want to synthesize…"
-            maxLength={MAX_CHARS}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = 'var(--focus)'
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = 'var(--border)'
-            }}
-          />
-          <div
-            className="mt-1.5 text-xs text-right tabular-nums"
-            style={{ color: charsLeft < 200 ? 'var(--danger)' : 'var(--subtle)' }}
-          >
-            {charsLeft.toLocaleString()} characters remaining
-          </div>
-        </section>
-
-        {/* Controls row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-
-          {/* Accent picker */}
-          <section
-            className="rounded-2xl p-4 border backdrop-blur-sm"
-            style={{ background: 'var(--surface-strong)', borderColor: 'var(--border)' }}
-          >
-            <label
-              className="block text-xs font-semibold uppercase tracking-widest mb-2"
-              style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}
-            >
-              Accent / Style
-            </label>
-            <div className="relative">
-              <button
-                type="button"
-                className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-sm border transition-colors"
-                style={{
-                  background: 'var(--surface-muted)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--ink)',
-                }}
-                onClick={() => setAccentOpen((v) => !v)}
-                aria-haspopup="listbox"
-                aria-expanded={accentOpen}
-              >
-                <span className="truncate">{accent.label}</span>
-                <ChevronDown
-                  size={14}
-                  style={{
-                    color: 'var(--subtle)',
-                    transform: accentOpen ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.15s',
-                    flexShrink: 0,
-                  }}
-                />
-              </button>
-
-              <AnimatePresence>
-                {accentOpen && (
-                  <motion.ul
-                    role="listbox"
-                    initial={{ opacity: 0, y: -4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute z-20 left-0 right-0 mt-1 rounded-xl border overflow-auto shadow-lg"
-                    style={{
-                      background: 'var(--surface-strong)',
-                      borderColor: 'var(--border)',
-                      maxHeight: '220px',
-                      backdropFilter: 'blur(12px)',
-                    }}
-                  >
-                    {ACCENT_OPTIONS.map((opt) => (
-                      <li
-                        key={opt.value}
-                        role="option"
-                        aria-selected={accent.value === opt.value}
-                        className="px-3 py-2.5 cursor-pointer text-sm transition-colors"
-                        style={{
-                          background:
-                            accent.value === opt.value ? 'var(--surface-muted)' : 'transparent',
-                          color: 'var(--ink)',
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = 'var(--surface-muted)'
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background =
-                            accent.value === opt.value ? 'var(--surface-muted)' : 'transparent'
-                        }}
-                        onClick={() => {
-                          setAccent(opt)
-                          setAccentOpen(false)
-                        }}
-                      >
-                        <span className="font-medium">{opt.label}</span>
-                        {opt.description && (
-                          <span className="ml-1.5 text-xs" style={{ color: 'var(--subtle)' }}>
-                            {opt.description}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
-            </div>
-          </section>
-
-          {/* Format picker */}
-          <section
-            className="rounded-2xl p-4 border backdrop-blur-sm"
-            style={{ background: 'var(--surface-strong)', borderColor: 'var(--border)' }}
-          >
-            <label
-              className="block text-xs font-semibold uppercase tracking-widest mb-2"
-              style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}
-            >
-              Output Format
-            </label>
-            <div className="flex gap-2">
-              {FORMAT_OPTIONS.map((f) => (
-                <button
-                  key={f.value}
-                  type="button"
-                  className={clsx(
-                    'flex-1 rounded-xl py-2.5 text-sm font-medium border transition-colors',
-                  )}
-                  style={
-                    format === f.value
-                      ? {
-                          background: 'var(--accent)',
-                          borderColor: 'var(--accent)',
-                          color: '#fff',
-                        }
-                      : {
-                          background: 'var(--surface-muted)',
-                          borderColor: 'var(--border)',
-                          color: 'var(--ink-2)',
-                        }
-                  }
-                  onClick={() => setFormat(f.value)}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
-
-        {/* Voice Clone card */}
-        <section
-          className="rounded-2xl p-5 border backdrop-blur-sm"
-          style={{ background: 'var(--surface-strong)', borderColor: 'var(--border)' }}
-        >
-          <label
-            className="block text-xs font-semibold uppercase tracking-widest mb-2"
-            style={{ color: 'var(--muted)', letterSpacing: '0.08em' }}
-          >
-            Voice Clone (optional)
-          </label>
-          <p className="text-xs mb-3" style={{ color: 'var(--subtle)' }}>
-            Upload a reference voice recording to clone its tone and style. Max 15 MB.
-          </p>
-
-          {referenceFilename ? (
-            <div
-              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 border"
-              style={{
-                background: 'var(--surface-muted)',
-                borderColor: 'var(--border)',
-              }}
-            >
-              <div className="flex items-center gap-2 min-w-0">
-                <Mic size={14} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-                <span className="text-sm truncate" style={{ color: 'var(--ink)' }}>
-                  {referenceFilename}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={clearReference}
-                className="rounded-lg p-1 transition-colors"
-                style={{ color: 'var(--subtle)' }}
-                aria-label="Remove reference audio"
-              >
-                <X size={14} />
+    <div className="max-w-lg mx-auto px-4 pb-16 pt-4 space-y-4">
+      {/* Usage bar */}
+      {user && usage && (
+        <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium" style={{ color: 'rgba(240,250,247,0.6)' }}>Daily Usage</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs tabular-nums" style={{ color: '#f0faf7' }}>{usage.tokensUsed.toLocaleString()} / {usage.limit.toLocaleString()} chars</span>
+              <button type="button" onClick={onPlans} className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
+                style={{ background: 'rgba(32,210,160,0.12)', color: '#20d2a0' }}>
+                <Crown size={9} /> Upgrade
               </button>
             </div>
-          ) : (
-            <button
-              type="button"
-              className="w-full rounded-xl border-2 border-dashed py-4 flex flex-col items-center gap-1.5 transition-colors"
-              style={{ borderColor: 'var(--border-strong)', color: 'var(--muted)' }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Upload size={18} />
-              <span className="text-sm">Click to upload audio</span>
-              <span className="text-xs" style={{ color: 'var(--subtle)' }}>
-                MP3, WAV, M4A, OGG
-              </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+            <div className="h-full rounded-full transition-all"
+              style={{ width: `${limitPct}%`, background: limitPct > 85 ? '#ff6b8a' : 'linear-gradient(90deg, #20d2a0, #0ea882)' }} />
+          </div>
+        </div>
+      )}
+
+      {/* Vocal Profile */}
+      <Section title="Vocal Profile & Regional Accent" icon={<UserIcon size={14} style={{ color: '#20d2a0' }} />}>
+        <FieldLabel>Dialect & Accent</FieldLabel>
+        <SelectField value={accent.label} onChange={v => setAccent(ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0])}
+          options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
+
+        <FieldLabel>Vocal Timbre</FieldLabel>
+        <div className="flex gap-2">
+          {TIMBRE_OPTIONS.map(t => (
+            <button key={t} type="button" onClick={() => setTimbre(t)}
+              className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+              style={timbre === t
+                ? { background: 'rgba(32,210,160,0.15)', border: '1px solid rgba(32,210,160,0.4)', color: '#20d2a0' }
+                : { background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(240,250,247,0.5)' }}>
+              <UserIcon size={11} />{t}
             </button>
-          )}
+          ))}
+        </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="audio/*"
-            className="hidden"
-            onChange={handleFileChange}
-          />
+        <FieldLabel>Performance Style</FieldLabel>
+        <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
 
-          {referenceDataUrl && (
-            <div className="mt-3">
-              <label
-                className="block text-xs font-medium mb-1"
-                style={{ color: 'var(--muted)' }}
-              >
-                Reference transcript{' '}
-                <span style={{ color: 'var(--subtle)' }}>(optional, improves quality)</span>
-              </label>
-              <input
-                type="text"
-                className="w-full rounded-xl px-3 py-2 text-sm border outline-none transition-colors"
-                style={{
-                  background: 'var(--surface-muted)',
-                  borderColor: 'var(--border)',
-                  color: 'var(--ink)',
-                  fontFamily: 'inherit',
-                }}
-                placeholder="What does the recording say?"
-                value={referenceTranscript}
-                onChange={(e) => setReferenceTranscript(e.target.value)}
-                onFocus={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--focus)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                }}
-              />
-            </div>
-          )}
-        </section>
+        <div className="flex items-end gap-4">
+          <div className="flex-1">
+            <FieldLabel>Pacing <span className="tabular-nums" style={{ color: '#20d2a0' }}>{pacing.toFixed(2)}x</span></FieldLabel>
+            <input type="range" min={0.5} max={2.0} step={0.05} value={pacing} onChange={e => setPacing(Number(e.target.value))}
+              className="w-full accent-teal-400 h-1 rounded-full" style={{ accentColor: '#20d2a0' }} />
+          </div>
+          <div className="w-40">
+            <FieldLabel>Master Format</FieldLabel>
+            <SelectField value={format} onChange={setFormat} options={FORMAT_OPTIONS} />
+          </div>
+        </div>
+      </Section>
 
-        {/* CTA */}
-        <button
-          type="button"
-          disabled={!text.trim() || status === 'loading'}
-          onClick={() => { void handleSynthesize() }}
-          className="w-full rounded-2xl py-4 text-base font-semibold transition-all flex items-center justify-center gap-2"
-          style={
-            !text.trim() || status === 'loading'
-              ? {
-                  background: 'var(--surface-muted)',
-                  color: 'var(--subtle)',
-                  cursor: 'not-allowed',
-                  border: '1px solid var(--border)',
-                }
-              : {
-                  background: 'var(--accent)',
-                  color: '#fff',
-                  border: '1px solid var(--accent)',
-                  cursor: 'pointer',
-                }
-          }
-          onMouseEnter={(e) => {
-            if (text.trim() && status !== 'loading') {
-              e.currentTarget.style.background = 'var(--accent-hover)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (text.trim() && status !== 'loading') {
-              e.currentTarget.style.background = 'var(--accent)'
-            }
-          }}
-        >
-          {status === 'loading' ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              Synthesizing…
-            </>
-          ) : (
-            <>
-              <Mic size={18} />
-              Synthesize Voice
-            </>
-          )}
-        </button>
+      {/* Voice Cloning */}
+      <Section title="Voice Print Cloning" icon={<Mic size={14} style={{ color: '#20d2a0' }} />}>
+        <p className="text-xs leading-relaxed" style={{ color: 'rgba(240,250,247,0.45)' }}>
+          Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker's vocal identity and native inflection.
+        </p>
+
+        {referenceFile && (
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs"
+            style={{ background: 'rgba(32,210,160,0.08)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+            <CheckCircle2 size={13} />
+            <span className="truncate flex-1">{referenceFile.name}</span>
+            <button type="button" onClick={() => { setReferenceFile(null); setReferenceDataUrl(null) }}>
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {referenceFile && (
+          <div>
+            <FieldLabel>Reference Transcript (optional)</FieldLabel>
+            <input type="text" value={referenceTranscript} onChange={e => setReferenceTranscript(e.target.value)}
+              placeholder="What the speaker says in the recording…"
+              className="w-full rounded-xl px-3 py-2.5 text-xs outline-none border"
+              style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }} />
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <button type="button"
+            onClick={() => { if (isRecording) stopRecording(); else void startRecording() }}
+            className="flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-all"
+            style={isRecording
+              ? { background: 'rgba(255,107,138,0.15)', border: '1px solid rgba(255,107,138,0.35)', color: '#ff6b8a' }
+              : { background: 'rgba(186,43,76,0.15)', border: '1px solid rgba(186,43,76,0.3)', color: '#ff6b8a' }}>
+            <Mic size={15} />
+            {isRecording ? 'Stop Recording' : 'Record Microphone'}
+          </button>
+          <label className="flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(240,250,247,0.7)' }}>
+            <Upload size={15} />
+            Import Audio Clip
+            <input type="file" accept="audio/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
+          </label>
+        </div>
+      </Section>
+
+      {/* Script Editor */}
+      <Section title="Studio Script Editor" icon={<FileText size={14} style={{ color: '#20d2a0' }} />}>
+        <div className="flex flex-wrap gap-2">
+          {SCRIPT_TEMPLATES.map(t => (
+            <button key={t.label} type="button" onClick={() => loadTemplate(t)}
+              className="rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1.5 transition-all"
+              style={{ background: 'rgba(32,210,160,0.1)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+              <Sparkles size={10} /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="h-px my-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs flex items-center gap-1" style={{ color: 'rgba(240,250,247,0.4)' }}>
+            <Wand2 size={11} /> Insert Vocal Cue:
+          </span>
+          {VOCAL_CUES.map(cue => (
+            <button key={cue} type="button" onClick={() => insertCue(cue)}
+              className="rounded-lg px-2 py-1 text-xs transition-all"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(240,250,247,0.6)' }}>
+              {cue}
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          maxLength={3000}
+          placeholder="Type or paste your script here… Try inserting a vocal cue above."
+          rows={8}
+          className="w-full rounded-2xl px-4 py-3 text-sm outline-none border resize-y leading-relaxed"
+          style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,255,255,0.08)', color: '#f0faf7', fontFamily: 'inherit', minHeight: 160 }}
+          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(32,210,160,0.35)' }}
+          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+        />
+
+        <div className="flex items-center justify-between -mt-1">
+          <span className="text-xs tabular-nums" style={{ color: 'rgba(240,250,247,0.35)' }}>{charsUsed} / 3,000 characters</span>
+          <button type="button" onClick={() => setText('')} className="text-xs flex items-center gap-1 transition-colors"
+            style={{ color: 'rgba(240,250,247,0.35)' }}>
+            <X size={11} /> Clear Script
+          </button>
+        </div>
 
         {/* Error */}
         <AnimatePresence>
           {status === 'error' && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 6 }}
-              className="rounded-2xl px-4 py-3 flex items-start gap-3 border"
-              style={{
-                background: 'rgba(186,43,76,0.06)',
-                borderColor: 'rgba(186,43,76,0.20)',
-              }}
-            >
-              <AlertCircle size={16} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 2 }} />
-              <p className="text-sm" style={{ color: 'var(--danger)' }}>
-                {errorMsg}
-              </p>
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              className="rounded-xl px-3 py-2.5 flex items-start gap-2 text-xs"
+              style={{ background: 'rgba(255,107,138,0.1)', border: '1px solid rgba(255,107,138,0.25)', color: '#ff6b8a' }}>
+              <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+              <span>{errorMsg}</span>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Audio result */}
+        {/* Synthesize CTA */}
+        <button type="button" disabled={!text.trim() || status === 'loading'}
+          onClick={() => { void handleSynthesize() }}
+          className="w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all"
+          style={!text.trim() || status === 'loading'
+            ? { background: 'rgba(32,210,160,0.15)', color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
+            : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e', boxShadow: '0 0 24px rgba(32,210,160,0.2)' }}>
+          {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <AudioWaveform size={18} />}
+          {status === 'loading' ? 'Synthesizing Master Audio…' : 'Synthesize Studio Audio'}
+        </button>
+
+        {/* Progress card */}
         <AnimatePresence>
-          {status === 'success' && audioUrl && (
-            <motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="rounded-2xl p-5 border backdrop-blur-sm"
-              style={{ background: 'var(--surface-strong)', borderColor: 'var(--border)' }}
-            >
-              <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 size={16} style={{ color: 'var(--success)' }} />
-                <span className="text-sm font-medium" style={{ color: 'var(--success)' }}>
-                  Audio ready
-                </span>
+          {status === 'loading' && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+              className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(240,250,247,0.7)' }}>
+                  <Loader2 size={12} className="animate-spin" style={{ color: '#20d2a0' }} />
+                  {SYNTHESIS_STAGES[stageIndex]?.desc}
+                </div>
+                <div className="text-xs tabular-nums" style={{ color: 'rgba(240,250,247,0.5)' }}>
+                  {(elapsedMs / 1000).toFixed(1)}s{' '}
+                  <span style={{ color: '#20d2a0' }}>{stageProgress}%</span>
+                </div>
               </div>
-
-              {/* Native audio player */}
-              <audio
-                ref={audioRef}
-                src={audioUrl}
-                controls
-                className="w-full rounded-xl"
-                style={{ accentColor: 'var(--accent)' }}
-              />
-
-              {/* Actions */}
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { void audioRef.current?.play() }}
-                  className="flex-1 rounded-xl py-2.5 text-sm font-medium border flex items-center justify-center gap-1.5 transition-colors"
-                  style={{
-                    background: 'var(--surface-muted)',
-                    borderColor: 'var(--border)',
-                    color: 'var(--ink)',
-                  }}
-                >
-                  <Play size={14} />
-                  Play
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="flex-1 rounded-xl py-2.5 text-sm font-medium flex items-center justify-center gap-1.5 transition-colors"
-                  style={{
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    border: '1px solid var(--accent)',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'var(--accent-hover)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'var(--accent)'
-                  }}
-                >
-                  <Download size={14} />
-                  Download {format.toUpperCase()}
-                </button>
+              <div className="h-1 rounded-full overflow-hidden mb-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div className="h-full rounded-full transition-all"
+                  style={{ width: `${(stageIndex / SYNTHESIS_STAGES.length) * 100 + stageProgress / SYNTHESIS_STAGES.length}%`, background: 'linear-gradient(90deg, #20d2a0, #0ea882)' }} />
               </div>
-            </motion.section>
+              <div className="flex items-center gap-3 flex-wrap">
+                {SYNTHESIS_STAGES.map((s, i) => (
+                  <div key={s.label} className="flex items-center gap-1 text-xs"
+                    style={{ color: i < stageIndex ? '#20d2a0' : i === stageIndex ? '#f0faf7' : 'rgba(240,250,247,0.3)' }}>
+                    {i < stageIndex
+                      ? <CheckCircle2 size={10} style={{ color: '#20d2a0' }} />
+                      : <div className={`w-2.5 h-2.5 rounded-full border ${i === stageIndex ? 'border-teal-400' : 'border-white/20'}`}
+                          style={i === stageIndex ? { borderColor: '#20d2a0' } : {}} />}
+                    {s.label}
+                  </div>
+                ))}
+              </div>
+            </motion.div>
           )}
         </AnimatePresence>
-      </main>
+
+        {/* Audio player */}
+        <AnimatePresence>
+          {status === 'success' && audioUrl && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              className="rounded-2xl p-4" style={{ background: 'rgba(32,210,160,0.06)', border: '1px solid rgba(32,210,160,0.2)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle2 size={14} style={{ color: '#20d2a0' }} />
+                <span className="text-sm font-semibold" style={{ color: '#f0faf7' }}>Audio Ready</span>
+              </div>
+              <audio ref={audioRef} src={audioUrl} controls className="w-full mb-3"
+                style={{ borderRadius: 8, height: 36 }} />
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { void audioRef.current?.play() }}
+                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                  style={{ background: 'rgba(32,210,160,0.1)', border: '1px solid rgba(32,210,160,0.25)', color: '#20d2a0' }}>
+                  <Play size={12} /> Play
+                </button>
+                <button type="button" onClick={handleDownload}
+                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                  style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
+                  <Download size={12} /> Download {format.toUpperCase()}
+                </button>
+                <button type="button" onClick={() => { setStatus('idle'); setAudioUrl(null); setAudioBlob(null) }}
+                  className="rounded-xl px-3 py-2.5 text-xs transition-all"
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(240,250,247,0.5)' }}>
+                  <X size={13} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Guest CTA */}
+        {!user && (
+          <div className="rounded-2xl p-4 text-center" style={{ background: 'rgba(32,210,160,0.05)', border: '1px solid rgba(32,210,160,0.15)' }}>
+            <p className="text-xs mb-3" style={{ color: 'rgba(240,250,247,0.55)' }}>Sign in to synthesize audio and track your usage.</p>
+            <button type="button" onClick={onSignIn}
+              className="px-6 py-2.5 rounded-xl text-sm font-bold"
+              style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
+              Sign In / Create Account
+            </button>
+          </div>
+        )}
+      </Section>
+    </div>
+  )
+}
+
+// ── Small helpers ─────────────────────────────────────────────────────────────
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="flex items-center gap-2 mb-1">
+        {icon}
+        <span className="text-sm font-bold display" style={{ color: '#f0faf7' }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <div className="text-xs flex items-center gap-1 mt-1" style={{ color: 'rgba(240,250,247,0.5)' }}>{children}</div>
+}
+
+function SelectField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { label: string; value: string }[] }) {
+  return (
+    <div className="relative">
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full appearance-none rounded-xl px-4 py-3 text-sm outline-none border pr-9 transition-colors"
+        style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(32,210,160,0.3)', color: '#f0faf7', fontFamily: 'inherit' }}>
+        {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'rgba(240,250,247,0.4)' }} />
     </div>
   )
 }
