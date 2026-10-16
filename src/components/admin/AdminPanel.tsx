@@ -376,24 +376,6 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
           <Field label="Secret Key"><SField field="flutterwaveSecretKey" placeholder="FLWSECK-..." {...sp} /></Field>
           <Field label="Encryption Key"><SField field="flutterwaveEncryptionKey" placeholder="..." {...sp} /></Field>
           <Field label="Webhook Hash"><SField field="flutterwaveWebhookHash" placeholder="Your webhook secret hash" {...sp} /></Field>
-          <Field label="Currency">
-            <select value={cfg.flutterwaveCurrency || 'NGN'}
-              onChange={e => setCfg({ ...cfg, flutterwaveCurrency: e.target.value })}
-              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none border transition-all"
-              style={{ background: 'rgba(0,0,0,0.25)', borderColor: T.border, color: T.text, fontFamily: 'inherit' }}
-              onFocus={e => { e.currentTarget.style.borderColor = T.accentBorder }}
-              onBlur={e => { e.currentTarget.style.borderColor = T.border }}>
-              <option value="NGN">NGN — Nigerian Naira</option>
-              <option value="USD">USD — US Dollar</option>
-              <option value="GHS">GHS — Ghanaian Cedi</option>
-              <option value="KES">KES — Kenyan Shilling</option>
-              <option value="ZAR">ZAR — South African Rand</option>
-              <option value="UGX">UGX — Ugandan Shilling</option>
-              <option value="TZS">TZS — Tanzanian Shilling</option>
-              <option value="GBP">GBP — British Pound</option>
-              <option value="EUR">EUR — Euro</option>
-            </select>
-          </Field>
           <p className="text-xs" style={{ color: T.dim }}>Flutterwave Dashboard → Settings → API Keys &amp; Webhooks</p>
         </Card>
       </>}

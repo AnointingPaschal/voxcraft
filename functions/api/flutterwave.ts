@@ -7,61 +7,37 @@ export async function initializePayment(
   const cfg = await getSiteConfig(env)
   if (!cfg.flutterwaveSecretKey) return { error: 'Payment not configured. Contact admin.' }
 
-  const txRef = `voicera-${user.id}-${Date.now()}`
-
-  // Flutterwave minimum amount is 100 NGN / 1 USD — enforce a floor
-  const currency = cfg.flutterwaveCurrency || 'NGN'
-  const rawAmount = plan.price
-  const minAmount = currency === 'NGN' ? 100 : 1
-  const amount = Math.max(rawAmount, minAmount)
-
+  const txRef = `voxcraft-${user.id}-${Date.now()}`
   const rec: PaymentRecord = {
     id: crypto.randomUUID(), userId: user.id, plan: plan.id,
-    amount, currency, status: 'pending',
+    amount: plan.price, currency: 'USD', status: 'pending',
     txRef, createdAt: Date.now(),
   }
   await putPayment(env, rec)
 
-  const payload = {
-    tx_ref: txRef,
-    amount,
-    currency,
-    redirect_url: redirectUrl,
-    customer: {
-      email: user.email,
-      name: user.name,
-      phonenumber: user.phone || '00000000000',
-    },
-    customizations: {
-      title: cfg.siteName || 'Voicera',
-      description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/day`,
-      ...(cfg.logoUrl ? { logo: cfg.logoUrl } : {}),
-    },
-    payment_options: 'card,banktransfer,ussd',
-    meta: { voicera_tx_ref: txRef, user_id: user.id, plan_id: plan.id },
-  }
-
-  console.log('[FLW] Sending payload:', JSON.stringify({ ...payload, customer: { ...payload.customer } }))
-
   const res = await fetch('https://api.flutterwave.com/v3/payments', {
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.flutterwaveSecretKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      tx_ref: txRef, amount: plan.price, currency: 'USD',
+      redirect_url: redirectUrl,
+      customer: { email: user.email, name: user.name },
+      customizations: {
+        title: cfg.siteName,
+        description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/day`,
+        logo: cfg.logoUrl || undefined,
+      },
+      payment_options: 'card,ussd,bank_transfer',
+      meta: { txRef, userId: user.id, plan: plan.id },
+    }),
   })
 
   if (!res.ok) {
-    const errText = await res.text()
-    console.error('[FLW] Init failed:', res.status, errText)
-    try {
-      const parsed = JSON.parse(errText) as { message?: string }
-      if (parsed.message) return { error: `Payment error: ${parsed.message}` }
-    } catch { /* ignore */ }
-    return { error: `Payment initialization failed (${res.status}). Please try again.` }
+    console.error('[FLW] Init failed:', await res.text())
+    return { error: 'Payment initialization failed. Please try again.' }
   }
-  const data = await res.json() as { status: string; message?: string; data?: { link: string } }
-  if (data.status !== 'success' || !data.data?.link) {
-    return { error: data.message ? `Payment error: ${data.message}` : 'Payment initialization failed.' }
-  }
+  const data = await res.json() as { status: string; data?: { link: string } }
+  if (data.status !== 'success' || !data.data?.link) return { error: 'Payment initialization failed.' }
   return { link: data.data.link, txRef }
 }
 

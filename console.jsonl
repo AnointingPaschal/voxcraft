@@ -237,15 +237,3 @@
 {"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792186823623}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792186823625}
 {"level":"debug","message":"[vite] connected.","timestamp":1792186829462}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187058725}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187058917}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187058920}
-{"level":"debug","message":"[vite] connected.","timestamp":1792187119599}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187490772}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187490777}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187679057}
-{"level":"debug","message":"[vite] connected.","timestamp":1792187685367}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792187914088}
-{"level":"debug","message":"[vite] connected.","timestamp":1792187923140}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792188021045}
-{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792188448170}

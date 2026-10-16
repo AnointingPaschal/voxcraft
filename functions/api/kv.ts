@@ -32,7 +32,6 @@ const DEFAULT_CONFIG: SiteConfig = {
   flutterwaveSecretKey: '',
   flutterwaveEncryptionKey: '',
   flutterwaveWebhookHash: '',
-  flutterwaveCurrency: 'NGN',
   maintenanceMode: false,
   setupComplete: false,
   updatedAt: 0,
