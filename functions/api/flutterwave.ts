@@ -33,11 +33,18 @@ export async function initializePayment(
   })
 
   if (!res.ok) {
-    console.error('[FLW] Init failed:', await res.text())
-    return { error: 'Payment initialization failed. Please try again.' }
+    const errText = await res.text()
+    console.error('[FLW] Init failed:', res.status, errText)
+    try {
+      const parsed = JSON.parse(errText) as { message?: string }
+      if (parsed.message) return { error: `Payment error: ${parsed.message}` }
+    } catch { /* ignore */ }
+    return { error: `Payment initialization failed (${res.status}). Please try again.` }
   }
-  const data = await res.json() as { status: string; data?: { link: string } }
-  if (data.status !== 'success' || !data.data?.link) return { error: 'Payment initialization failed.' }
+  const data = await res.json() as { status: string; message?: string; data?: { link: string } }
+  if (data.status !== 'success' || !data.data?.link) {
+    return { error: data.message ? `Payment error: ${data.message}` : 'Payment initialization failed.' }
+  }
   return { link: data.data.link, txRef }
 }
 
