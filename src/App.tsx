@@ -63,19 +63,43 @@ const SYNTHESIS_STAGES = [
 
 type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin'
 
+function pathToPage(pathname: string): Page | null {
+  if (pathname === '/studio') return 'studio'
+  if (pathname === '/auth' || pathname === '/auth/callback') return 'auth'
+  if (pathname === '/plans') return 'plans'
+  if (pathname === '/admin') return 'admin'
+  return null
+}
+
+function navigate(path: string) {
+  window.history.pushState({}, '', path)
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App(): JSX.Element {
-  const { user, loading: authLoading, refresh } = useAuth()
-  const [page, setPage] = useState<Page>('home')
+  const { user, loading: authLoading, refresh, logout } = useAuth()
+  const [page, setPageState] = useState<Page>(() => pathToPage(window.location.pathname) ?? 'home')
   const [setupChecked, setSetupChecked] = useState(false)
   const [needsSetup, setNeedsSetup] = useState(false)
-  const { logout } = useAuth()
+  const [workerDown, setWorkerDown] = useState(false)
+
+  const setPage = (p: Page) => {
+    setPageState(p)
+    navigate(p === 'home' ? '/' : `/${p}`)
+  }
+
+  // Sync page state when browser back/forward is used
+  useEffect(() => {
+    const onPop = () => setPageState(pathToPage(window.location.pathname) ?? 'home')
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
 
   // Check setup status once on mount
   useEffect(() => {
     getSetupStatus()
       .then(s => { if (!s.setupComplete) setNeedsSetup(true) })
-      .catch(() => { /* worker not reachable — skip */ })
+      .catch(() => setWorkerDown(true))
       .finally(() => setSetupChecked(true))
   }, [])
 
@@ -85,7 +109,7 @@ export default function App(): JSX.Element {
     const cbToken = params.get('token')
     if (window.location.pathname === '/auth/callback' && cbToken) {
       localStorage.setItem('vc_token', cbToken)
-      window.history.replaceState({}, '', '/')
+      window.history.replaceState({}, '', '/studio')
       window.location.reload()
     }
   }, [])
@@ -96,19 +120,42 @@ export default function App(): JSX.Element {
     </div>
   )
 
+  if (workerDown) return (
+    <div className="min-h-dvh flex items-center justify-center px-6" style={{ background: '#0a121e' }}>
+      <div className="max-w-md w-full rounded-2xl p-8 text-center space-y-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(32,210,160,0.12)' }}>
+          <AudioWaveform size={24} style={{ color: '#20d2a0' }} />
+        </div>
+        <h2 className="text-xl font-bold" style={{ color: '#f0faf7' }}>Worker API Not Connected</h2>
+        <p className="text-sm leading-relaxed" style={{ color: 'rgba(240,250,247,0.55)' }}>
+          The Voicera backend Worker is not reachable. Make sure you have deployed the Worker to Cloudflare and set <code className="px-1 py-0.5 rounded text-xs" style={{ background: 'rgba(32,210,160,0.1)', color: '#20d2a0' }}>VITE_API_BASE</code> in your Pages environment variables.
+        </p>
+        <div className="text-xs rounded-xl px-4 py-3 text-left font-mono space-y-1" style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(240,250,247,0.5)' }}>
+          <div>VITE_API_BASE=https://voicera-api</div>
+          <div style={{ color: 'rgba(240,250,247,0.3)' }}>.YOUR-NAME.workers.dev</div>
+        </div>
+        <button onClick={() => window.location.reload()} className="w-full py-3 rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg,#20d2a0,#17a882)', color: '#fff' }}>
+          Retry Connection
+        </button>
+      </div>
+    </div>
+  )
+
   if (needsSetup) return (
     <SetupWizard onComplete={() => { setNeedsSetup(false); void refresh() }} />
   )
+
+  // Guard /admin — redirect to auth if not logged in, redirect to home if not admin
+  if (page === 'admin') {
+    if (!user) { setPage('auth'); return <></> }
+    if (user.role !== 'admin') { setPage('home'); return <></> }
+    return <PageShell><AdminPanel onBack={() => setPage('studio')} /></PageShell>
+  }
 
   if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} />
   if (page === 'plans') return (
     <PageShell>
       <PlansPage onBack={() => setPage('studio')} />
-    </PageShell>
-  )
-  if (page === 'admin' && user?.role === 'admin') return (
-    <PageShell>
-      <AdminPanel onBack={() => setPage('studio')} />
     </PageShell>
   )
   if (page === 'studio') return (
