@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import {
   Settings, Users, CreditCard, BarChart2, Save, Loader2,
   CheckCircle2, Key, Globe, Palette, Eye, EyeOff, ChevronDown, ChevronUp,
+  ShieldCheck, Banknote,
 } from 'lucide-react'
 import {
   adminGetConfig, adminPatchConfig, adminGetPlans, adminPutPlans,
@@ -9,14 +10,18 @@ import {
   type FullSiteConfig, type Plan, type AuthUser, type AdminStats,
 } from '../../lib/api'
 
-type Tab = 'stats' | 'config' | 'plans' | 'users'
+type Tab = 'stats' | 'config' | 'voice' | 'google' | 'flutterwave' | 'security' | 'plans' | 'users'
 
 export default function AdminPanel({ onBack }: { onBack: () => void }) {
   const [tab, setTab] = useState<Tab>('stats')
 
   const tabs: { id: Tab; label: string; icon: typeof Settings }[] = [
     { id: 'stats', label: 'Overview', icon: BarChart2 },
-    { id: 'config', label: 'Site Config', icon: Settings },
+    { id: 'config', label: 'Site', icon: Globe },
+    { id: 'voice', label: 'Voice API', icon: Key },
+    { id: 'google', label: 'Google', icon: Settings },
+    { id: 'flutterwave', label: 'Payments', icon: Banknote },
+    { id: 'security', label: 'Security', icon: ShieldCheck },
     { id: 'plans', label: 'Plans', icon: CreditCard },
     { id: 'users', label: 'Users', icon: Users },
   ]
@@ -49,7 +54,11 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
       </div>
 
       {tab === 'stats' && <StatsTab />}
-      {tab === 'config' && <ConfigTab />}
+      {tab === 'config' && <ConfigTab section="identity" />}
+      {tab === 'voice' && <ConfigTab section="voice" />}
+      {tab === 'google' && <ConfigTab section="google" />}
+      {tab === 'flutterwave' && <ConfigTab section="flutterwave" />}
+      {tab === 'security' && <ConfigTab section="security" />}
       {tab === 'plans' && <PlansTab />}
       {tab === 'users' && <UsersTab />}
     </div>
@@ -89,18 +98,22 @@ function StatCard({ label, value }: { label: string; value: number }) {
   )
 }
 
-// ── Config ────────────────────────────────────────────────────────────────────
-function ConfigTab() {
+// ── Config (multi-section) ────────────────────────────────────────────────────
+type ConfigSection = 'identity' | 'voice' | 'google' | 'flutterwave' | 'security'
+
+function ConfigTab({ section }: { section: ConfigSection }) {
   const [cfg, setCfg] = useState<FullSiteConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
-  const [showKey, setShowKey] = useState(false)
+  const [show, setShow] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     adminGetConfig().then(setCfg).catch(console.error).finally(() => setLoading(false))
-  }, [])
+  }, [section])
+
+  const toggleShow = (k: string) => setShow(s => ({ ...s, [k]: !s[k] }))
 
   async function handleSave(e: FormEvent) {
     e.preventDefault()
@@ -108,78 +121,140 @@ function ConfigTab() {
     setSaving(true); setError(''); setSaved(false)
     try {
       const updated = await adminPatchConfig(cfg)
-      setCfg(updated)
-      setSaved(true)
+      setCfg(updated); setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed.')
-    } finally {
-      setSaving(false)
-    }
+    } finally { setSaving(false) }
   }
 
   if (loading || !cfg) return <Spinner />
 
+  const secretInputProps = { cfg, setCfg, show, toggleShow }
+
   return (
-    <form onSubmit={(e) => { void handleSave(e) }} className="space-y-4">
-      <SectionCard title="Site Identity" icon={<Globe size={14} />}>
-        <AdminInput label="Site Name" value={cfg.siteName} onChange={v => setCfg({ ...cfg, siteName: v })} />
-        <AdminInput label="Tagline" value={cfg.tagline} onChange={v => setCfg({ ...cfg, tagline: v })} />
-        <AdminInput label="Logo URL" value={cfg.logoUrl} onChange={v => setCfg({ ...cfg, logoUrl: v })} placeholder="https://..." />
-        <AdminInput label="Support Email" value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} />
-      </SectionCard>
+    <form onSubmit={e => { void handleSave(e) }} className="space-y-4">
 
-      <SectionCard title="Voice Engine (OpenRouter)" icon={<Key size={14} />}>
-        <div className="relative">
-          <AdminInput
-            label="OpenRouter API Key"
-            value={cfg.openrouterApiKey}
-            type={showKey ? 'text' : 'password'}
-            onChange={v => setCfg({ ...cfg, openrouterApiKey: v })}
-            placeholder="sk-or-v1-..."
-          />
-          <button type="button" onClick={() => setShowKey(v => !v)}
-            className="absolute right-3 bottom-3" style={{ color: 'rgba(240,250,247,0.4)' }}>
-            {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
-          </button>
-        </div>
-        <AdminInput label="Model ID" value={cfg.openrouterModel} onChange={v => setCfg({ ...cfg, openrouterModel: v })} placeholder="fish-audio/s2.1-pro-free:free" />
-        <div className="text-xs px-1" style={{ color: 'rgba(240,250,247,0.35)' }}>
-          Find model IDs at openrouter.ai/models — search "fish-audio" or "tts"
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Appearance" icon={<Palette size={14} />}>
-        <div className="flex items-center gap-3">
-          <AdminInput label="Brand Color" value={cfg.primaryColor} onChange={v => setCfg({ ...cfg, primaryColor: v })} />
-          <div className="w-8 h-8 rounded-lg mt-5 flex-shrink-0" style={{ background: cfg.primaryColor, border: '1px solid rgba(255,255,255,0.1)' }} />
-        </div>
-      </SectionCard>
-
-      <SectionCard title="Maintenance" icon={<Settings size={14} />}>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div
-            onClick={() => setCfg({ ...cfg, maintenanceMode: !cfg.maintenanceMode })}
-            className="w-10 h-5 rounded-full relative transition-colors flex-shrink-0"
-            style={{ background: cfg.maintenanceMode ? '#20d2a0' : 'rgba(255,255,255,0.1)' }}
-          >
-            <div className="w-4 h-4 rounded-full absolute top-0.5 transition-transform"
-              style={{ background: '#fff', left: cfg.maintenanceMode ? '22px' : '2px' }} />
+      {section === 'identity' && <>
+        <SectionCard title="Site Identity" icon={<Globe size={14} />}>
+          <AdminInput label="Site Name" value={cfg.siteName} onChange={v => setCfg({ ...cfg, siteName: v })} />
+          <AdminInput label="Tagline" value={cfg.tagline} onChange={v => setCfg({ ...cfg, tagline: v })} />
+          <AdminInput label="Logo URL" value={cfg.logoUrl} onChange={v => setCfg({ ...cfg, logoUrl: v })} placeholder="https://..." />
+          <AdminInput label="Support Email" value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} />
+          {cfg.logoUrl && <img src={cfg.logoUrl} alt="logo preview" className="h-12 mt-2 rounded-lg object-contain" style={{ background: 'rgba(255,255,255,0.05)', padding: 4 }} />}
+        </SectionCard>
+        <SectionCard title="Appearance" icon={<Palette size={14} />}>
+          <div className="flex items-center gap-3">
+            <AdminInput label="Brand Color (hex)" value={cfg.primaryColor} onChange={v => setCfg({ ...cfg, primaryColor: v })} />
+            <div className="w-8 h-8 rounded-lg mt-5 flex-shrink-0" style={{ background: cfg.primaryColor, border: '1px solid rgba(255,255,255,0.1)' }} />
           </div>
-          <span className="text-sm" style={{ color: 'rgba(240,250,247,0.7)' }}>Maintenance Mode</span>
-        </label>
-      </SectionCard>
+        </SectionCard>
+        <SectionCard title="System" icon={<Settings size={14} />}>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => setCfg({ ...cfg, maintenanceMode: !cfg.maintenanceMode })}
+              className="w-10 h-5 rounded-full relative transition-colors flex-shrink-0"
+              style={{ background: cfg.maintenanceMode ? '#20d2a0' : 'rgba(255,255,255,0.1)' }}>
+              <div className="w-4 h-4 rounded-full absolute top-0.5 transition-transform"
+                style={{ background: '#fff', left: cfg.maintenanceMode ? '22px' : '2px' }} />
+            </div>
+            <span className="text-sm" style={{ color: 'rgba(240,250,247,0.7)' }}>Maintenance Mode (locks non-admin access)</span>
+          </label>
+        </SectionCard>
+      </>}
+
+      {section === 'voice' && <>
+        <InfoBanner icon={<Key size={13} />} text="Your OpenRouter API key is stored encrypted in Cloudflare KV — never exposed to users." />
+        <SectionCard title="Voice Engine — OpenRouter" icon={<Key size={14} />}>
+          <SecretField label="OpenRouter API Key" field="openrouterApiKey" placeholder="sk-or-v1-..." {...secretInputProps} />
+          <AdminInput label="Model ID" value={cfg.openrouterModel} onChange={v => setCfg({ ...cfg, openrouterModel: v })} placeholder="fish-audio/s2.1-pro-free:free" />
+          <div className="text-xs px-1 pt-1" style={{ color: 'rgba(240,250,247,0.35)' }}>
+            Find model IDs at <span style={{ color: '#20d2a0' }}>openrouter.ai/models</span> — search "fish-audio" or "tts"
+          </div>
+        </SectionCard>
+      </>}
+
+      {section === 'google' && <>
+        <InfoBanner icon={<Settings size={13} />} text="Set Authorised redirect URI in Google Console to the value shown below." />
+        <SectionCard title="Google OAuth" icon={<Settings size={14} />}>
+          <AdminInput label="Google Client ID" value={cfg.googleClientId} onChange={v => setCfg({ ...cfg, googleClientId: v })} placeholder="123456789-xxx.apps.googleusercontent.com" />
+          <SecretField label="Google Client Secret" field="googleClientSecret" placeholder="GOCSPX-..." {...secretInputProps} />
+          <AdminInput label="Redirect URI" value={cfg.googleRedirectUri} onChange={v => setCfg({ ...cfg, googleRedirectUri: v })} placeholder="https://your-worker.workers.dev/api/auth/google/callback" />
+          <div className="text-xs rounded-xl px-3 py-2 font-mono" style={{ background: 'rgba(32,210,160,0.06)', color: 'rgba(240,250,247,0.5)', wordBreak: 'break-all' }}>
+            {cfg.googleRedirectUri || 'Set Redirect URI above, then paste it in Google Console → Authorised redirect URIs'}
+          </div>
+        </SectionCard>
+      </>}
+
+      {section === 'flutterwave' && <>
+        <InfoBanner icon={<Banknote size={13} />} text="Set your Flutterwave webhook URL to: https://your-worker.workers.dev/api/payment/webhook" />
+        <SectionCard title="Flutterwave Payments" icon={<Banknote size={14} />}>
+          <AdminInput label="Public Key" value={cfg.flutterwavePublicKey} onChange={v => setCfg({ ...cfg, flutterwavePublicKey: v })} placeholder="FLWPUBK-..." />
+          <SecretField label="Secret Key" field="flutterwaveSecretKey" placeholder="FLWSECK-..." {...secretInputProps} />
+          <SecretField label="Encryption Key" field="flutterwaveEncryptionKey" placeholder="..." {...secretInputProps} />
+          <SecretField label="Webhook Hash / Secret" field="flutterwaveWebhookHash" placeholder="Your webhook secret hash" {...secretInputProps} />
+          <div className="text-xs px-1" style={{ color: 'rgba(240,250,247,0.35)' }}>
+            Find these in Flutterwave Dashboard → Settings → API Keys &amp; Webhooks
+          </div>
+        </SectionCard>
+      </>}
+
+      {section === 'security' && <>
+        <InfoBanner icon={<ShieldCheck size={13} />} text="Rotating the JWT secret invalidates ALL active sessions — users will need to log in again." />
+        <SectionCard title="JWT Secret" icon={<ShieldCheck size={14} />}>
+          <SecretField label="JWT Secret (signs all tokens)" field="jwtSecret" placeholder="Min 32 characters" {...secretInputProps} />
+          <AdminInput label="Admin Email (gets admin role on register)" value={cfg.adminEmail} type="email" onChange={v => setCfg({ ...cfg, adminEmail: v })} />
+        </SectionCard>
+      </>}
 
       {error && <div className="text-xs rounded-xl px-3 py-2" style={{ background: 'rgba(186,43,76,0.12)', color: '#ff6b8a' }}>{error}</div>}
 
       <button type="submit" disabled={saving}
         className="w-full rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2"
-        style={saving ? { background: 'rgba(32,210,160,0.1)', color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
+        style={saving
+          ? { background: 'rgba(32,210,160,0.1)', color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
           : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
         {saving ? <Loader2 size={15} className="animate-spin" /> : saved ? <CheckCircle2 size={15} /> : <Save size={15} />}
-        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Configuration'}
+        {saved ? 'Saved!' : saving ? 'Saving…' : 'Save'}
       </button>
     </form>
+  )
+}
+
+interface SecretFieldProps {
+  label: string
+  field: keyof FullSiteConfig
+  placeholder?: string
+  cfg: FullSiteConfig
+  setCfg: (c: FullSiteConfig) => void
+  show: Record<string, boolean>
+  toggleShow: (k: string) => void
+}
+
+function SecretField({ label, field, placeholder, cfg, setCfg, show, toggleShow }: SecretFieldProps) {
+  return (
+    <div className="relative">
+      <AdminInput
+        label={label}
+        value={String(cfg[field] ?? '')}
+        type={show[field] ? 'text' : 'password'}
+        onChange={v => setCfg({ ...cfg, [field]: v })}
+        placeholder={placeholder}
+      />
+      <button type="button" onClick={() => toggleShow(field)}
+        className="absolute right-3 bottom-3"
+        style={{ color: 'rgba(240,250,247,0.4)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+        {show[field] ? <EyeOff size={13} /> : <Eye size={13} />}
+      </button>
+    </div>
+  )
+}
+
+function InfoBanner({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-xl px-4 py-3" style={{ background: 'rgba(32,210,160,0.07)', border: '1px solid rgba(32,210,160,0.18)' }}>
+      <span style={{ color: '#20d2a0', flexShrink: 0, marginTop: 1 }}>{icon}</span>
+      <span className="text-xs" style={{ color: 'rgba(240,250,247,0.55)' }}>{text}</span>
+    </div>
   )
 }
 

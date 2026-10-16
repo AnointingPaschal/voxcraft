@@ -1,15 +1,16 @@
 export interface Env {
   KV: KVNamespace
   ENVIRONMENT: string
-  ADMIN_EMAIL: string
-  JWT_SECRET: string
-  GOOGLE_CLIENT_ID: string
-  GOOGLE_CLIENT_SECRET: string
-  GOOGLE_REDIRECT_URI: string
-  FLUTTERWAVE_PUBLIC_KEY: string
-  FLUTTERWAVE_SECRET_KEY: string
-  FLUTTERWAVE_ENCRYPTION_KEY: string
-  FLUTTERWAVE_WEBHOOK_HASH: string
+  // All of these are OPTIONAL — can be set from Admin panel and stored in KV instead
+  ADMIN_EMAIL?: string
+  JWT_SECRET?: string
+  GOOGLE_CLIENT_ID?: string
+  GOOGLE_CLIENT_SECRET?: string
+  GOOGLE_REDIRECT_URI?: string
+  FLUTTERWAVE_PUBLIC_KEY?: string
+  FLUTTERWAVE_SECRET_KEY?: string
+  FLUTTERWAVE_ENCRYPTION_KEY?: string
+  FLUTTERWAVE_WEBHOOK_HASH?: string
 }
 
 export interface User {
@@ -17,7 +18,7 @@ export interface User {
   email: string
   name: string
   avatar?: string
-  passwordHash?: string // undefined for OAuth users
+  passwordHash?: string
   provider: 'email' | 'google'
   plan: 'free' | 'starter' | 'pro' | 'enterprise'
   role: 'user' | 'admin'
@@ -31,7 +32,7 @@ export interface User {
 export interface Plan {
   id: 'free' | 'starter' | 'pro' | 'enterprise'
   name: string
-  price: number // USD/month
+  price: number
   tokensPerDay: number
   features: string[]
   popular?: boolean
@@ -39,26 +40,42 @@ export interface Plan {
 }
 
 export interface SiteConfig {
+  // ── Identity ────────────────────────────────
   siteName: string
   tagline: string
   logoUrl: string
   primaryColor: string
   supportEmail: string
+  // ── Voice Engine ────────────────────────────
   openrouterApiKey: string
   openrouterModel: string
+  // ── Auth / Security ─────────────────────────
+  jwtSecret: string
+  adminEmail: string
+  // ── Google OAuth ────────────────────────────
+  googleClientId: string
+  googleClientSecret: string
+  googleRedirectUri: string
+  // ── Flutterwave ─────────────────────────────
+  flutterwavePublicKey: string
+  flutterwaveSecretKey: string
+  flutterwaveEncryptionKey: string
+  flutterwaveWebhookHash: string
+  // ── System ──────────────────────────────────
   maintenanceMode: boolean
+  setupComplete: boolean
   updatedAt: number
 }
 
 export interface UsageRecord {
   userId: string
-  date: string // YYYY-MM-DD
+  date: string
   tokensUsed: number
   lastUpdated: number
 }
 
 export interface JWTPayload {
-  sub: string // userId
+  sub: string
   email: string
   role: 'user' | 'admin'
   plan: string

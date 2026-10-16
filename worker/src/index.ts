@@ -26,6 +26,35 @@ export default {
     const url = new URL(req.url)
     const path = url.pathname
 
+    // ── Setup (first-run, no auth required) ──────────────────────────────
+    if (path === '/api/setup/status' && req.method === 'GET') {
+      const config = await getSiteConfig(env)
+      return json({ setupComplete: config.setupComplete, hasJwtSecret: !!config.jwtSecret })
+    }
+
+    if (path === '/api/setup/init' && req.method === 'POST') {
+      const config = await getSiteConfig(env)
+      if (config.setupComplete) return err('Setup already completed.', 403)
+      const body = await req.json() as Record<string, string>
+      const { adminEmail, adminPassword, adminName, jwtSecret, siteName } = body
+      if (!adminEmail || !adminPassword || !adminName) return err('Admin email, password and name are required.')
+      if (!jwtSecret || jwtSecret.length < 32) return err('JWT secret must be at least 32 characters.')
+
+      // Save config first so registerEmail can use the JWT secret
+      await putSiteConfig(env, {
+        adminEmail: adminEmail.toLowerCase(),
+        jwtSecret,
+        siteName: siteName || 'VoxCraft Studio',
+        setupComplete: true,
+      })
+
+      // Create the admin user
+      const { registerEmail: reg } = await import('./auth')
+      const result = await reg(env, adminEmail, adminPassword, adminName)
+      if ('error' in result) return err(result.error)
+      return json({ success: true, token: result.token, user: result.user })
+    }
+
     // ── Auth ──────────────────────────────────────────────────────────────
     if (path === '/api/auth/register' && req.method === 'POST') {
       const { email, password, name } = await req.json() as { email: string; password: string; name: string }
@@ -43,6 +72,7 @@ export default {
 
     if (path === '/api/auth/google' && req.method === 'GET') {
       const authUrl = await getGoogleAuthUrl(env)
+      if (!authUrl) return err('Google OAuth is not configured. Set it up in the Admin panel.', 503)
       return json({ url: authUrl })
     }
 
@@ -193,9 +223,10 @@ export default {
       const admin = await requireAdmin(env, req)
       if (!admin) return err('Forbidden', 403)
 
-      // GET /api/admin/config
+      // GET /api/admin/config (full, including credentials — admin only)
       if (path === '/api/admin/config' && req.method === 'GET') {
-        return json(await getSiteConfig(env))
+        const full = await getSiteConfig(env)
+        return json(full)
       }
 
       // PATCH /api/admin/config

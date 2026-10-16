@@ -7,10 +7,11 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, type UsageData } from './lib/api'
+import { synthesize, getUsage, getSetupStatus, type UsageData } from './lib/api'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
+import SetupWizard from './components/auth/SetupWizard'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ACCENT_OPTIONS = [
@@ -63,9 +64,20 @@ const SYNTHESIS_STAGES = [
 type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin'
 
 // ── App ───────────────────────────────────────────────────────────────────────
-export default function App() {
-  const { user, loading: authLoading, logout } = useAuth()
+export default function App(): JSX.Element {
+  const { user, loading: authLoading, refresh } = useAuth()
   const [page, setPage] = useState<Page>('home')
+  const [setupChecked, setSetupChecked] = useState(false)
+  const [needsSetup, setNeedsSetup] = useState(false)
+  const { logout } = useAuth()
+
+  // Check setup status once on mount
+  useEffect(() => {
+    getSetupStatus()
+      .then(s => { if (!s.setupComplete) setNeedsSetup(true) })
+      .catch(() => { /* worker not reachable — skip */ })
+      .finally(() => setSetupChecked(true))
+  }, [])
 
   // Handle Google OAuth callback
   useEffect(() => {
@@ -78,10 +90,14 @@ export default function App() {
     }
   }, [])
 
-  if (authLoading) return (
+  if (!setupChecked || authLoading) return (
     <div className="min-h-dvh flex items-center justify-center" style={{ background: '#0a121e' }}>
       <Loader2 size={28} className="animate-spin" style={{ color: '#20d2a0' }} />
     </div>
+  )
+
+  if (needsSetup) return (
+    <SetupWizard onComplete={() => { setNeedsSetup(false); void refresh() }} />
   )
 
   if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} />

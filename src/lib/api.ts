@@ -112,10 +112,32 @@ export async function verifyPayment(txRef: string): Promise<{ success: boolean; 
   return handle(await fetch(`${BASE}/payment/verify`, { method: 'POST', headers: headers(), body: JSON.stringify({ txRef }) }))
 }
 
+// ── Setup ─────────────────────────────────────────────────────────────────────
+export async function getSetupStatus(): Promise<{ setupComplete: boolean; hasJwtSecret: boolean }> {
+  return handle(await fetch(`${BASE}/setup/status`))
+}
+
+export async function runSetup(body: { adminEmail: string; adminPassword: string; adminName: string; jwtSecret: string; siteName: string }): Promise<{ success: boolean; token: string; user: AuthUser }> {
+  return handle(await fetch(`${BASE}/setup/init`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }))
+}
+
 // ── Admin ─────────────────────────────────────────────────────────────────────
 export interface FullSiteConfig extends SiteConfig {
   openrouterApiKey: string
   openrouterModel: string
+  // Auth / Security
+  jwtSecret: string
+  adminEmail: string
+  // Google OAuth
+  googleClientId: string
+  googleClientSecret: string
+  googleRedirectUri: string
+  // Flutterwave
+  flutterwavePublicKey: string
+  flutterwaveSecretKey: string
+  flutterwaveEncryptionKey: string
+  flutterwaveWebhookHash: string
+  setupComplete: boolean
   updatedAt: number
 }
 

@@ -1,6 +1,6 @@
 import type { Env, User } from './types'
 import { signJWT, verifyJWT } from './jwt'
-import { getUser, getUserByEmail, putUser, keys } from './kv'
+import { getUser, getUserByEmail, putUser, getSiteConfig, keys } from './kv'
 
 // ── Password hashing (PBKDF2 via WebCrypto) ──────────────────────────────────
 async function hashPassword(password: string): Promise<string> {
@@ -23,9 +23,7 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return computed === hashHex
 }
 
-function generateId(): string {
-  return crypto.randomUUID()
-}
+function generateId(): string { return crypto.randomUUID() }
 
 // ── Email/password register ───────────────────────────────────────────────────
 export async function registerEmail(env: Env, email: string, password: string, name: string): Promise<{ token: string; user: User } | { error: string }> {
@@ -33,73 +31,70 @@ export async function registerEmail(env: Env, email: string, password: string, n
   if (password.length < 8) return { error: 'Password must be at least 8 characters.' }
   const existing = await getUserByEmail(env, email)
   if (existing) return { error: 'Email already registered.' }
+  const cfg = await getSiteConfig(env)
+  if (!cfg.jwtSecret) return { error: 'Server not configured yet. Complete setup first.' }
 
   const id = generateId()
-  const isAdmin = email.toLowerCase() === env.ADMIN_EMAIL?.toLowerCase()
+  const isAdmin = email.toLowerCase() === cfg.adminEmail.toLowerCase()
   const user: User = {
-    id,
-    email: email.toLowerCase(),
-    name,
-    provider: 'email',
-    plan: 'free',
+    id, email: email.toLowerCase(), name,
+    provider: 'email', plan: 'free',
     role: isAdmin ? 'admin' : 'user',
-    createdAt: Date.now(),
-    emailVerified: false,
+    createdAt: Date.now(), emailVerified: false,
     passwordHash: await hashPassword(password),
   }
   await putUser(env, user)
-  const token = await signJWT({ sub: user.id, email: user.email, role: user.role, plan: user.plan }, env.JWT_SECRET)
+  const token = await signJWT({ sub: user.id, email: user.email, role: user.role, plan: user.plan }, cfg.jwtSecret)
   return { token, user: sanitize(user) }
 }
 
 // ── Email/password login ──────────────────────────────────────────────────────
 export async function loginEmail(env: Env, email: string, password: string): Promise<{ token: string; user: User } | { error: string }> {
+  const cfg = await getSiteConfig(env)
+  if (!cfg.jwtSecret) return { error: 'Server not configured yet.' }
   const user = await getUserByEmail(env, email)
   if (!user || !user.passwordHash) return { error: 'Invalid email or password.' }
   const ok = await verifyPassword(password, user.passwordHash)
   if (!ok) return { error: 'Invalid email or password.' }
-  const token = await signJWT({ sub: user.id, email: user.email, role: user.role, plan: user.plan }, env.JWT_SECRET)
+  const token = await signJWT({ sub: user.id, email: user.email, role: user.role, plan: user.plan }, cfg.jwtSecret)
   return { token, user: sanitize(user) }
 }
 
 // ── Google OAuth ──────────────────────────────────────────────────────────────
-export async function getGoogleAuthUrl(env: Env): Promise<string> {
+export async function getGoogleAuthUrl(env: Env): Promise<string | null> {
+  const cfg = await getSiteConfig(env)
+  if (!cfg.googleClientId || !cfg.googleRedirectUri) return null
   const state = generateId()
-  // Store state for 10 min
   await env.KV.put(keys.oauthState(state), '1', { expirationTtl: 600 })
   const params = new URLSearchParams({
-    client_id: env.GOOGLE_CLIENT_ID,
-    redirect_uri: env.GOOGLE_REDIRECT_URI,
+    client_id: cfg.googleClientId,
+    redirect_uri: cfg.googleRedirectUri,
     response_type: 'code',
     scope: 'openid email profile',
-    state,
-    access_type: 'offline',
-    prompt: 'select_account',
+    state, access_type: 'offline', prompt: 'select_account',
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
 }
 
 export async function handleGoogleCallback(env: Env, code: string, state: string): Promise<{ token: string; user: User } | { error: string }> {
+  const cfg = await getSiteConfig(env)
   const stateVal = await env.KV.get(keys.oauthState(state))
   if (!stateVal) return { error: 'Invalid or expired OAuth state.' }
   await env.KV.delete(keys.oauthState(state))
 
-  // Exchange code for tokens
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      code,
-      client_id: env.GOOGLE_CLIENT_ID,
-      client_secret: env.GOOGLE_CLIENT_SECRET,
-      redirect_uri: env.GOOGLE_REDIRECT_URI,
+      code, client_id: cfg.googleClientId,
+      client_secret: cfg.googleClientSecret,
+      redirect_uri: cfg.googleRedirectUri,
       grant_type: 'authorization_code',
     }),
   })
   if (!tokenRes.ok) return { error: 'Failed to exchange Google token.' }
   const { access_token } = await tokenRes.json() as { access_token: string }
 
-  // Get user info
   const infoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${access_token}` },
   })
@@ -108,17 +103,11 @@ export async function handleGoogleCallback(env: Env, code: string, state: string
 
   let user = await getUserByEmail(env, profile.email)
   if (!user) {
-    const isAdmin = profile.email.toLowerCase() === env.ADMIN_EMAIL?.toLowerCase()
+    const isAdmin = profile.email.toLowerCase() === cfg.adminEmail.toLowerCase()
     user = {
-      id: generateId(),
-      email: profile.email.toLowerCase(),
-      name: profile.name,
-      avatar: profile.picture,
-      provider: 'google',
-      plan: 'free',
-      role: isAdmin ? 'admin' : 'user',
-      createdAt: Date.now(),
-      emailVerified: true,
+      id: generateId(), email: profile.email.toLowerCase(), name: profile.name,
+      avatar: profile.picture, provider: 'google', plan: 'free',
+      role: isAdmin ? 'admin' : 'user', createdAt: Date.now(), emailVerified: true,
     }
     await putUser(env, user)
   } else if (profile.picture && !user.avatar) {
@@ -126,7 +115,7 @@ export async function handleGoogleCallback(env: Env, code: string, state: string
     await putUser(env, user)
   }
 
-  const token = await signJWT({ sub: user.id, email: user.email, role: user.role, plan: user.plan }, env.JWT_SECRET)
+  const token = await signJWT({ sub: user.id, email: user.email, role: user.role, plan: user.plan }, cfg.jwtSecret)
   return { token, user: sanitize(user) }
 }
 
@@ -135,7 +124,9 @@ export async function requireAuth(env: Env, req: Request): Promise<User | null> 
   const auth = req.headers.get('Authorization') ?? ''
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null
   if (!token) return null
-  const payload = await verifyJWT(token, env.JWT_SECRET)
+  const cfg = await getSiteConfig(env)
+  if (!cfg.jwtSecret) return null
+  const payload = await verifyJWT(token, cfg.jwtSecret)
   if (!payload) return null
   return getUser(env, payload.sub)
 }
