@@ -42,8 +42,9 @@ export async function initializePayment(
       customer: { email: user.email, name: user.name },
       customizations: {
         title: cfg.siteName || 'VoxCraft Studio',
-        description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/${plan.tokenBillingMode === 'month' ? 'month' : 'day'}`,
-        logo: cfg.logoUrl || undefined,
+        description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/${(plan as {tokenBillingMode?:string}).tokenBillingMode === 'month' ? 'month' : 'day'}`,
+        // Only pass logo if it's a real HTTPS URL — base64 data URLs break the checkout page
+        ...(cfg.logoUrl?.startsWith('https://') ? { logo: cfg.logoUrl } : {}),
       },
       payment_options: 'card,ussd,bank_transfer,mobilemoney',
       meta: { txRef, userId: user.id, plan: plan.id },
@@ -52,11 +53,16 @@ export async function initializePayment(
 
   if (!res.ok) {
     const errText = await res.text()
-    console.error('[FLW] Init failed:', errText)
-    return { error: 'Payment initialization failed. Please try again.' }
+    console.error('[FLW] Init failed:', res.status, errText)
+    let msg = 'Payment initialization failed.'
+    try { const j = JSON.parse(errText) as {message?:string}; if (j.message) msg = j.message } catch { /* ignore */ }
+    return { error: msg }
   }
-  const data = await res.json() as { status: string; data?: { link: string } }
-  if (data.status !== 'success' || !data.data?.link) return { error: 'Payment initialization failed.' }
+  const data = await res.json() as { status: string; message?: string; data?: { link: string } }
+  if (data.status !== 'success' || !data.data?.link) {
+    console.error('[FLW] Bad response:', JSON.stringify(data))
+    return { error: data.message ?? 'Payment initialization failed.' }
+  }
   return { link: data.data.link, txRef }
 }
 
