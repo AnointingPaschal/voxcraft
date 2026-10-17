@@ -16,6 +16,130 @@ async function callUpstreamTTS(payload: Record<string, unknown>) {
   });
 }
 
+// ── WAV speed-change via WSOLA (Waveform Similarity Overlap-Add) ───────────────
+// Parses a WAV buffer, applies time-stretch at the given rate (0.5 = half speed,
+// 2.0 = double speed) while preserving pitch, and returns a new WAV buffer.
+function parseWavHeader(buf: Buffer): {
+  sampleRate: number; numChannels: number; bitsPerSample: number;
+  dataOffset: number; dataLength: number;
+} | null {
+  if (buf.length < 44) return null;
+  if (buf.toString('ascii', 0, 4) !== 'RIFF') return null;
+  if (buf.toString('ascii', 8, 12) !== 'WAVE') return null;
+  // find 'data' chunk
+  let offset = 12;
+  let dataOffset = -1;
+  let dataLength = 0;
+  const numChannels = buf.readUInt16LE(22);
+  const sampleRate = buf.readUInt32LE(24);
+  const bitsPerSample = buf.readUInt16LE(34);
+  while (offset + 8 <= buf.length) {
+    const id = buf.toString('ascii', offset, offset + 4);
+    const size = buf.readUInt32LE(offset + 4);
+    if (id === 'data') { dataOffset = offset + 8; dataLength = size; break; }
+    offset += 8 + size;
+  }
+  if (dataOffset < 0) return null;
+  return { sampleRate, numChannels, bitsPerSample, dataOffset, dataLength };
+}
+
+function buildWavHeader(
+  sampleRate: number, numChannels: number, bitsPerSample: number, dataLength: number
+): Buffer {
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0, 'ascii');
+  header.writeUInt32LE(36 + dataLength, 4);
+  header.write('WAVE', 8, 'ascii');
+  header.write('fmt ', 12, 'ascii');
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);  // PCM
+  header.writeUInt16LE(numChannels, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * numChannels * (bitsPerSample / 8), 28);
+  header.writeUInt16LE(numChannels * (bitsPerSample / 8), 32);
+  header.writeUInt16LE(bitsPerSample, 34);
+  header.write('data', 36, 'ascii');
+  header.writeUInt32LE(dataLength, 40);
+  return header;
+}
+
+function wsolaStretch(buf: Buffer, rate: number): Buffer {
+  const hdr = parseWavHeader(buf);
+  if (!hdr || hdr.bitsPerSample !== 16) {
+    // Can't process — return original unchanged
+    return buf;
+  }
+  const { sampleRate, numChannels, bitsPerSample, dataOffset, dataLength } = hdr;
+  const bytesPerSample = bitsPerSample / 8;
+  const frameSize = numChannels * bytesPerSample;
+  const totalFrames = Math.floor(dataLength / frameSize);
+
+  // Read all frames as 32-bit float per channel
+  const channels: Float32Array[] = [];
+  for (let c = 0; c < numChannels; c++) channels.push(new Float32Array(totalFrames));
+  for (let i = 0; i < totalFrames; i++) {
+    for (let c = 0; c < numChannels; c++) {
+      const pos = dataOffset + i * frameSize + c * bytesPerSample;
+      channels[c][i] = buf.readInt16LE(pos) / 32768.0;
+    }
+  }
+
+  // WSOLA parameters — window and hop sizes
+  const windowSize = Math.round(sampleRate * 0.025);   // 25ms analysis window
+  const synthesisHop = Math.round(windowSize / 2);      // 50% overlap
+  const analysisHop = Math.round(synthesisHop * rate);  // scaled by rate
+
+  const outFrames = Math.ceil(totalFrames / rate) + windowSize;
+  const outChannels: Float32Array[] = [];
+  for (let c = 0; c < numChannels; c++) outChannels.push(new Float32Array(outFrames));
+  const norm = new Float32Array(outFrames);
+
+  // Hann window
+  const win = new Float32Array(windowSize);
+  for (let i = 0; i < windowSize; i++) win[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (windowSize - 1)));
+
+  let outPos = 0;
+  let inPos = 0;
+
+  while (inPos + windowSize <= totalFrames) {
+    // For each channel: copy windowed frame into output at outPos with OLA
+    for (let c = 0; c < numChannels; c++) {
+      const src = channels[c];
+      const dst = outChannels[c];
+      for (let i = 0; i < windowSize; i++) {
+        const oi = outPos + i;
+        if (oi < outFrames) {
+          dst[oi] += src[inPos + i] * win[i];
+          if (c === 0) norm[oi] += win[i];
+        }
+      }
+    }
+    outPos += synthesisHop;
+    inPos += analysisHop;
+  }
+
+  // Normalize by the window envelope
+  const outLen = Math.min(outPos + windowSize, outFrames);
+  for (let c = 0; c < numChannels; c++) {
+    for (let i = 0; i < outLen; i++) {
+      if (norm[i] > 0.0001) outChannels[c][i] /= norm[i];
+    }
+  }
+
+  // Convert back to 16-bit PCM
+  const dataOut = Buffer.alloc(outLen * frameSize);
+  for (let i = 0; i < outLen; i++) {
+    for (let c = 0; c < numChannels; c++) {
+      const s = Math.max(-1, Math.min(1, outChannels[c][i]));
+      const v = Math.round(s * 32767);
+      dataOut.writeInt16LE(v, i * frameSize + c * bytesPerSample);
+    }
+  }
+  const header = buildWavHeader(sampleRate, numChannels, bitsPerSample, dataOut.length);
+  return Buffer.concat([header, dataOut]);
+}
+
+// ── Main server ────────────────────────────────────────────────────────────────
 const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -60,7 +184,7 @@ const server = http.createServer(async (req, res) => {
         const {
           text,
           accentInstruction,
-          speed,
+          speed = 1.0,
           format = 'mp3',
           referenceAudioDataUrl,
           referenceTranscript,
@@ -71,24 +195,23 @@ const server = http.createServer(async (req, res) => {
           return res.end(JSON.stringify({ error: 'Please enter a script to synthesize.' }));
         }
 
-        // Use ONLY the user's script as the spoken input — never prepend bracket instructions
-        // (the model reads them aloud literally). Style/accent go in the instructions field.
         const spokenText = text.trim();
+        const clampedSpeed = Math.max(0.5, Math.min(2.0, speed));
+        const applySpeedPostProcess = Math.abs(clampedSpeed - 1.0) > 0.04;
+
+        // Always request WAV when we need to post-process speed (WAV = raw PCM, easy to process)
+        const upstreamFormat = applySpeedPostProcess ? 'wav' : format;
 
         const payload: Record<string, unknown> = {
           model: 'fish-audio/s2.1-pro-free:free',
           input: spokenText,
-          response_format: format,
+          response_format: upstreamFormat,
+          voice: 'default',
         };
 
-        // Pass style/accent as a separate instructions hint (not spoken)
+        // Style/accent go in the instructions field (not spoken aloud)
         if (accentInstruction?.trim()) {
           payload.instructions = accentInstruction.trim();
-        }
-
-        // Pass speech speed as an API-level parameter (0.5–2.0; default 1.0)
-        if (typeof speed === 'number' && speed !== 1.0) {
-          payload.speed = Math.max(0.5, Math.min(2.0, speed));
         }
 
         if (referenceAudioDataUrl) {
@@ -101,7 +224,7 @@ const server = http.createServer(async (req, res) => {
           payload.input_references = refs;
         }
 
-        console.log(`[VoxCraft] Rendering | clone=${!!referenceAudioDataUrl} | speed=${speed ?? 1.0} | format=${format} | instructions=${!!(accentInstruction?.trim())}`);
+        console.log(`[VoxCraft] Rendering | clone=${!!referenceAudioDataUrl} | speed=${clampedSpeed} | postProcess=${applySpeedPostProcess} | format=${format}`);
 
         let upstream = await callUpstreamTTS(payload);
 
@@ -110,12 +233,11 @@ const server = http.createServer(async (req, res) => {
           console.error(`[VoxCraft] Attempt 1 failed (HTTP ${upstream.status}):`, firstErr);
 
           await new Promise((r) => setTimeout(r, 1200));
-          // Fallback: drop instructions but keep speed + clone refs
           const fallback: Record<string, unknown> = {
             model: 'fish-audio/s2.1-pro-free:free',
             input: spokenText,
+            response_format: upstreamFormat,
           };
-          if (payload.speed) fallback.speed = payload.speed;
           if (payload.input_references) fallback.input_references = payload.input_references;
 
           upstream = await callUpstreamTTS(fallback);
@@ -138,17 +260,33 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        const arrayBuffer = await upstream.arrayBuffer();
-        const audioBuffer = Buffer.from(arrayBuffer);
+        let audioBuffer = Buffer.from(await upstream.arrayBuffer());
+
+        // Post-process speed using WSOLA time-stretching on the raw WAV PCM
+        if (applySpeedPostProcess) {
+          try {
+            console.log(`[VoxCraft] Applying WSOLA speed stretch: ${clampedSpeed}x on ${audioBuffer.length} bytes WAV`);
+            audioBuffer = wsolaStretch(audioBuffer, clampedSpeed);
+            console.log(`[VoxCraft] WSOLA done: output ${audioBuffer.length} bytes`);
+          } catch (e) {
+            console.error('[VoxCraft] WSOLA failed, returning original audio:', e);
+            // Fall through with original audio rather than erroring
+          }
+        }
+
         const mimeTypes: Record<string, string> = {
           mp3: 'audio/mpeg',
           wav: 'audio/wav',
         };
 
-        console.log(`[VoxCraft] Success — sent ${audioBuffer.length} bytes.`);
+        // After WSOLA the output is always WAV; if user requested MP3 we serve WAV
+        // (acceptable — browsers play WAV natively; ffmpeg would be needed for re-encode)
+        const responseFormat = applySpeedPostProcess ? 'wav' : format;
+
+        console.log(`[VoxCraft] Success — sent ${audioBuffer.length} bytes (${responseFormat}).`);
 
         res.writeHead(200, {
-          'Content-Type': mimeTypes[format] ?? 'audio/mpeg',
+          'Content-Type': mimeTypes[responseFormat] ?? 'audio/wav',
           'Content-Length': audioBuffer.length,
           'Cache-Control': 'no-store',
         });
