@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, getVoiceSamples, type UsageData, type VoiceSample } from './lib/api'
+import { synthesize, getUsage, getVoiceSamples, getPublicConfig, type UsageData, type VoiceSample, type SiteConfig } from './lib/api'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
@@ -62,12 +62,14 @@ const SYNTHESIS_STAGES = [
   { label: 'Mastering', desc: 'Mastering audio for studio quality…' },
 ]
 
-type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin'
+type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin' | 'about' | 'contact'
 
 function pathToPage(pathname: string): Page | null {
   if (pathname === '/studio') return 'studio'
   if (pathname === '/auth' || pathname === '/auth/callback') return 'auth'
-  if (pathname === '/plans') return 'plans'
+  if (pathname === '/plans' || pathname === '/pricing') return 'plans'
+  if (pathname === '/about') return 'about'
+  if (pathname === '/contact') return 'contact'
   if (pathname === '/admin') return 'admin'
   return null
 }
@@ -84,6 +86,7 @@ export default function App(): JSX.Element {
   const [needsSetup, setNeedsSetup] = useState(false)
   const [workerDown, setWorkerDown] = useState(false)
   const [kvMissing, setKvMissing] = useState(false)
+  const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('vc_theme') as 'light' | 'dark') || 'light')
 
   useEffect(() => {
@@ -106,6 +109,18 @@ export default function App(): JSX.Element {
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
+
+  useEffect(() => { getPublicConfig().then(setSiteConfig).catch(() => undefined) }, [])
+
+  useEffect(() => { if (siteConfig && !siteConfig.allowThemeToggle && theme !== 'light') { setTheme('light'); localStorage.setItem('vc_theme', 'light') } }, [siteConfig, theme])
+
+  useEffect(() => {
+    if (!siteConfig) return
+    const palette = theme === 'dark' ? siteConfig.darkPalette : siteConfig.lightPalette
+    if (!palette) return
+    const root = document.documentElement
+    root.style.setProperty('--site-bg', palette.background); root.style.setProperty('--site-surface', palette.surface); root.style.setProperty('--site-text', palette.text); root.style.setProperty('--site-muted', palette.muted); root.style.setProperty('--site-border', palette.border); root.style.setProperty('--site-accent', palette.accent); root.style.setProperty('--bg', palette.background); root.style.setProperty('--page', palette.background); root.style.setProperty('--paper', palette.surface); root.style.setProperty('--paper-2', palette.surface); root.style.setProperty('--surface', palette.surface); root.style.setProperty('--ink', palette.text); root.style.setProperty('--ink-soft', palette.text); root.style.setProperty('--muted-ink', palette.muted); root.style.setProperty('--line', palette.border); root.style.setProperty('--border', palette.border); root.style.setProperty('--accent', palette.accent); root.style.setProperty('--accent-deep', palette.accent); root.style.setProperty('--land-bg', palette.background); root.style.setProperty('--land-panel', palette.surface); root.style.setProperty('--land-ink', palette.text); root.style.setProperty('--land-muted', palette.muted); root.style.setProperty('--land-line', palette.border); root.style.setProperty('--land-accent', palette.accent)
+  }, [siteConfig, theme])
 
   // Check setup status once on mount
   useEffect(() => {
@@ -186,11 +201,11 @@ export default function App(): JSX.Element {
   )
   if (page === 'studio') return (
     <PageShell>
-      <StudioHeader user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} />
+      <StudioHeader allowThemeToggle={siteConfig?.allowThemeToggle ?? true} user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} />
       <StudioBody user={user} onSignIn={() => setPage('auth')} onPlans={() => setPage('plans')} />
     </PageShell>
   )
-  return <HomePage onEnter={() => setPage(user ? 'studio' : 'auth')} onSignIn={() => setPage('auth')} user={user} onStudio={() => setPage('studio')} />
+  return <HomePage allowThemeToggle={siteConfig?.allowThemeToggle ?? true} siteConfig={siteConfig} page={page} onNavigate={setPage} onEnter={() => setPage(user ? 'studio' : 'auth')} onSignIn={() => setPage('auth')} user={user} onStudio={() => setPage('studio')} />
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
@@ -202,7 +217,9 @@ function PageShell({ children }: { children: React.ReactNode }) {
 }
 
 // ── Home Page ─────────────────────────────────────────────────────────────────
-function HomePage({ onEnter, onSignIn, user, onStudio }: { onEnter: () => void; onSignIn: () => void; user: ReturnType<typeof useAuth>['user']; onStudio: () => void }) {
+function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, siteConfig, page, onNavigate }: { allowThemeToggle?: boolean; siteConfig: SiteConfig | null; page: Page; onNavigate: (p: Page) => void; onEnter: () => void; onSignIn: () => void; user: ReturnType<typeof useAuth>['user']; onStudio: () => void }) {
+  const [samples, setSamples] = useState<VoiceSample[]>([])
+  useEffect(() => { getVoiceSamples().then(setSamples).catch(() => setSamples([])) }, [])
   const features = [
     { icon: Globe, title: 'Made for African voices', desc: 'Choose the cadence, accent, and character that fits your story.' },
     { icon: Mic, title: 'Bring a voice to life', desc: 'Preview curated voices or upload a short reference sample.' },
@@ -212,12 +229,13 @@ function HomePage({ onEnter, onSignIn, user, onStudio }: { onEnter: () => void; 
   return (
     <div className="landing min-h-dvh">
       <nav className="landing-nav">
-        <a href="/" className="brand-lockup" aria-label="VoxCraft home"><span className="brand-mark"><AudioWaveform size={18} /></span><span>voxcraft</span><span className="brand-dot">STUDIO</span></a>
-        <div className="landing-links"><a href="#studio">Studio</a><a href="#voices">Voices</a><a href="#workflow">How it works</a><a href="/plans">Plans</a></div>
-        <div className="landing-actions"><ThemeToggle />{user ? <button className="button button-primary" onClick={onStudio}>Open studio <ArrowRightIcon /></button> : <button className="button button-quiet" onClick={onSignIn}>Sign in</button>}</div>
+        <a href="/" className="brand-lockup" aria-label="VoxCraft home">{siteConfig?.logoUrl ? <img className="uploaded-brand-logo" src={siteConfig.logoUrl} alt=""/> : <span className="brand-mark"><AudioWaveform size={18} /></span>}<span>{siteConfig?.siteName || 'voxcraft'}</span><span className="brand-dot">STUDIO</span></a>
+        <div className="landing-links"><a href="#studio">Studio</a><a href="#voice-samples">Voices</a><a href="/about" onClick={e => { e.preventDefault(); onNavigate('about') }}>About</a><a href="/contact" onClick={e => { e.preventDefault(); onNavigate('contact') }}>Contact</a><a href="/plans">Pricing</a></div>
+        <div className="landing-actions"><ThemeToggle enabled={allowThemeToggle} />{user ? <button className="button button-primary" onClick={onStudio}>Open studio <ArrowRightIcon /></button> : <button className="button button-quiet" onClick={onSignIn}>Sign in</button>}</div>
       </nav>
 
       <main>
+        {(page === 'about' || page === 'contact') ? <section className="info-page"><div className="eyebrow">VOXCRAFT STUDIO</div><h1>{page === 'about' ? 'A voice with room for every story.' : 'Let’s make something worth hearing.'}</h1><p>{page === 'about' ? 'VoxCraft helps creators shape spoken ideas with expressive voices, regional character, and a simple production workflow.' : 'Questions about your workspace, plans, or voice library? Reach our team and we’ll help you find the right next step.'}</p>{page === 'contact' && <a className="button button-primary" href={`mailto:${siteConfig?.supportEmail || 'support@voxcraft.ai'}`}>Email {siteConfig?.supportEmail || 'support@voxcraft.ai'} <ArrowRightIcon /></a>}</section> : <>
         <section className="hero-section" id="studio">
           <div className="hero-copy">
             <div className="eyebrow"><span className="live-dot" /> VOICE, WITH A POINT OF VIEW</div>
@@ -238,13 +256,15 @@ function HomePage({ onEnter, onSignIn, user, onStudio }: { onEnter: () => void; 
 
         <section className="signal-strip"><span>VOICE FOR</span><b>Films & stories</b><i/><b>Learning</b><i/><b>Creators</b><i/><b>Brands</b><i/><b>Everyday ideas</b></section>
 
+        {samples.length > 0 && <section className="samples-section" id="voice-samples"><div className="section-heading"><div><div className="eyebrow">MEET THE VOICES</div><h2>Hear the voice<br/><em>before the story.</em></h2></div><p>Preview voices from the VoxCraft library and take your favorite into the studio.</p></div><div className="sample-grid">{samples.map(sample => <article className="sample-card" key={sample.id}><div className="sample-card-head"><span className="sample-avatar">{sample.name.slice(0,1).toUpperCase()}</span><div><b>{sample.name}</b><small>{sample.accent}</small></div><span className="sample-wave">〰</span></div><p>{sample.description || 'A voice ready for your next idea.'}</p><audio controls preload="none" src={sample.audioDataUrl}/><button className="sample-use" onClick={onStudio}>Use this voice <ArrowRightIcon/></button></article>)}</div></section>}
         <section className="features-section" id="voices"><div className="section-heading"><div><div className="eyebrow">A STUDIO THAT GETS IT</div><h2>More than words.<br /><em>All the feeling between them.</em></h2></div><p>From the first line to the final listen, shape the sound until it feels like yours.</p></div><div className="feature-grid">{features.map((f, i) => <motion.article key={f.title} className="feature-card" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * .07 }}><span className="feature-number">0{i + 1}</span><span className="feature-icon"><f.icon size={18}/></span><h3>{f.title}</h3><p>{f.desc}</p></motion.article>)}</div></section>
 
         <section className="workflow-section" id="workflow"><div className="workflow-copy"><div className="eyebrow">FROM PAGE TO PLAY</div><h2>Your next idea<br />sounds <em>closer.</em></h2><p>Choose a voice, bring your script, and direct the delivery. VoxCraft takes care of the rest, with controls that stay out of your way.</p><button className="button button-primary" onClick={onEnter}>Start creating <ArrowRightIcon /></button></div><div className="workflow-steps"><div><span>01</span><b>Choose your voice</b><small>Preview samples and find a natural fit.</small></div><div><span>02</span><b>Shape the delivery</b><small>Set the pace, mood, and vocal cues.</small></div><div><span>03</span><b>Make it yours</b><small>Synthesize and take your audio anywhere.</small></div></div></section>
 
         <section className="closing-cta"><div><div className="eyebrow">SOUND LIKE YOURSELF</div><h2>There’s a voice for that.</h2><p>Make something people want to listen to.</p></div><button className="button button-dark" onClick={onEnter}>Step into the studio <ArrowRightIcon /></button></section>
+        </>}
       </main>
-      <footer className="landing-footer"><a href="/" className="brand-lockup"><span className="brand-mark"><AudioWaveform size={16}/></span><span>voxcraft</span></a><span>Voice, with a point of view.</span><button onClick={onSignIn}>Your workspace <ArrowRightIcon /></button></footer>
+      <footer className="landing-footer"><a href="/" className="brand-lockup">{siteConfig?.logoUrl ? <img className="uploaded-brand-logo" src={siteConfig.logoUrl} alt=""/> : <span className="brand-mark"><AudioWaveform size={16}/></span>}<span>{siteConfig?.siteName || 'voxcraft'}</span></a><span>Voice, with a point of view.</span><div className="footer-links"><button onClick={() => onNavigate('about')}>About</button><button onClick={() => onNavigate('contact')}>Contact</button><button onClick={() => onNavigate('plans')}>Pricing</button><button onClick={onSignIn}>Your workspace <ArrowRightIcon /></button></div></footer>
     </div>
   )
 }
@@ -252,7 +272,8 @@ function HomePage({ onEnter, onSignIn, user, onStudio }: { onEnter: () => void; 
 function ArrowRightIcon() { return <span aria-hidden="true">↗</span> }
 
 // ── Studio Header ─────────────────────────────────────────────────────────────
-function StudioHeader({ user, onLogout, onPlans, onAdmin }: {
+function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = true }: {
+  allowThemeToggle?: boolean
   user: ReturnType<typeof useAuth>['user']
   onLogout: () => void
   onPlans: () => void
@@ -272,7 +293,7 @@ function StudioHeader({ user, onLogout, onPlans, onAdmin }: {
       </div>
 
       <div className="flex items-center gap-2">
-        <ThemeToggle />
+        <ThemeToggle enabled={allowThemeToggle} />
         <div className="hidden sm:flex items-center gap-1.5 text-xs" style={{ color: 'rgba(240,250,247,0.5)' }}>
           <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#20d2a0', boxShadow: '0 0 6px #20d2a0' }} />
           Acoustic Engine Ready

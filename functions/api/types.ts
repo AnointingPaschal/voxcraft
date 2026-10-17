@@ -40,12 +40,17 @@ export interface Plan {
   flwPlanId?: string
 }
 
+export interface ThemePalette { background: string; surface: string; text: string; muted: string; border: string; accent: string }
+
 export interface SiteConfig {
   // ── Identity ────────────────────────────────
   siteName: string
   tagline: string
   logoUrl: string
   primaryColor: string
+  lightPalette: ThemePalette
+  darkPalette: ThemePalette
+  allowThemeToggle: boolean
   supportEmail: string
   // ── Voice Engine ────────────────────────────
   openrouterApiKey: string

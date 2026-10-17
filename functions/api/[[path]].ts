@@ -219,6 +219,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     if (path === '/api/admin/config' && req.method === 'GET') return json(await getSiteConfig(env))
     if (path === '/api/admin/config' && req.method === 'PATCH') {
       const body = await req.json() as Record<string, unknown>
+      if (typeof body.logoUrl === 'string' && body.logoUrl && !/^data:image\//.test(body.logoUrl) && !/^https?:\/\//.test(body.logoUrl)) return e('Logo must be an uploaded image or an HTTPS URL.')
+      if (typeof body.logoUrl === 'string' && body.logoUrl.length > 1_000_000) return e('Logo file is too large.')
       return json(await putSiteConfig(env, body))
     }
     if (path === '/api/admin/plans' && req.method === 'GET') return json(await getPlans(env))

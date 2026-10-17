@@ -318,7 +318,7 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
           <CardTitle icon={<Globe size={14} />} title="Brand" />
           <Field label="Site Name"><AInput value={cfg.siteName} onChange={v => setCfg({ ...cfg, siteName: v })} /></Field>
           <Field label="Tagline"><AInput value={cfg.tagline} onChange={v => setCfg({ ...cfg, tagline: v })} /></Field>
-          <Field label="Logo URL"><AInput value={cfg.logoUrl} onChange={v => setCfg({ ...cfg, logoUrl: v })} placeholder="https://..." /></Field>
+          <Field label="Logo file"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 700_000) { setError('Logo must be under 700 KB.'); return } const reader = new FileReader(); reader.onload = () => setCfg({ ...cfg, logoUrl: String(reader.result) }); reader.readAsDataURL(file) }} className="w-full text-xs" /></Field>
           <Field label="Support Email"><AInput value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} /></Field>
           {cfg.logoUrl && (
             <div className="pt-2">
@@ -335,6 +335,9 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
               <div className="w-9 h-9 rounded-xl flex-shrink-0 mt-1" style={{ background: cfg.primaryColor, border: `1px solid ${T.border}` }} />
             </div>
           </Field>
+          <PaletteEditor title="Light mode palette" palette={cfg.lightPalette} onChange={lightPalette => setCfg({ ...cfg, lightPalette })} />
+          <PaletteEditor title="Dark mode palette" palette={cfg.darkPalette} onChange={darkPalette => setCfg({ ...cfg, darkPalette })} />
+          <button type="button" onClick={() => setCfg({ ...cfg, allowThemeToggle: !cfg.allowThemeToggle })} className="mt-3 flex w-full items-center justify-between"><span className="text-sm" style={{ color: T.muted }}>Show theme switch to visitors</span><Toggle on={cfg.allowThemeToggle} /></button>
         </Card>
         <Card>
           <CardTitle icon={<Settings size={14} />} title="System" />
@@ -518,6 +521,12 @@ function PlansTab() {
   )
 }
 
+
+
+function PaletteEditor({ title, palette, onChange }: { title: string; palette: FullSiteConfig['lightPalette']; onChange: (p: FullSiteConfig['lightPalette']) => void }) {
+  const labels: [keyof typeof palette, string][] = [['background','Background'],['surface','Cards'],['text','Text'],['muted','Muted text'],['border','Borders'],['accent','Accent']]
+  return <div className="mt-5 rounded-xl p-3" style={{ border: `1px solid ${T.border}` }}><div className="mb-3 text-xs font-semibold" style={{ color: T.text }}>{title}</div><div className="grid grid-cols-2 gap-3">{labels.map(([key,label]) => <label key={key} className="grid gap-1 text-[11px]" style={{color:T.muted}}>{label}<div className="flex gap-2"><input type="color" value={palette[key]} onChange={e => onChange({...palette,[key]:e.target.value})} className="h-8 w-9 rounded"/><AInput value={palette[key]} onChange={v => onChange({...palette,[key]:v})}/></div></label>)}</div></div>
+}
 
 function VoiceSamplesTab() {
   const [voices, setVoices] = useState<VoiceSample[]>([])
