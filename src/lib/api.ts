@@ -128,7 +128,7 @@ const DEFAULT_STUDIO_CONFIG: StudioConfig = {
   speedMin: 0.5,
   speedMax: 2.0,
   speedDefault: 1.0,
-  maxChars: 3000,
+  maxChars: 10000,
 }
 
 export async function getStudioConfig(): Promise<StudioConfig> {

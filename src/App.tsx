@@ -774,15 +774,13 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
   const ACCENT_OPTIONS = sc.accentOptions
   const PERF_STYLES = sc.perfStyles
-  const VOCAL_CUES = sc.vocalCues
-  const SCRIPT_TEMPLATES = sc.scriptTemplates
-  const TIMBRE_OPTIONS = sc.timbreOptions
+  // VOCAL_CUES, SCRIPT_TEMPLATES, TIMBRE_OPTIONS removed from user studio UI
 
   const [accent, setAccent] = useState(() => sc.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
   const [voices, setVoices] = useState<VoiceSample[]>([])
   const [selectedVoiceId, setSelectedVoiceId] = useState('')
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
-  const [timbre, setTimbre] = useState<Timbre>('Male')
+  const [timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
   const [pacing] = useState(1.0)
   const [format, setFormat] = useState('mp3')
@@ -805,7 +803,18 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const startTimeRef = useRef<number>(0)
 
   useEffect(() => {
-    getVoiceSamples().then(setVoices).catch(() => null)
+    getVoiceSamples().then(loaded => {
+      setVoices(loaded)
+      // Auto-wire clone reference for the initially selected accent
+      const currentAccent = accent
+      const match = loaded.find(v => v.name.toLowerCase() === currentAccent.label.toLowerCase())
+      if (match?.audioDataUrl) {
+        setReferenceDataUrl(match.audioDataUrl)
+        setSelectedVoiceId(match.id)
+      }
+    }).catch(() => null)
+  // Only on mount — accent dependency intentionally omitted
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -831,16 +840,6 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     if (timerRef.current) clearInterval(timerRef.current)
     if (success) { setStageIndex(SYNTHESIS_STAGES.length - 1); setStageProgress(100) }
   }, [])
-
-  const insertCue = useCallback((cue: string) => {
-    setText(prev => prev + cue + ' ')
-  }, [])
-
-  const loadTemplate = useCallback((t: typeof SCRIPT_TEMPLATES[number]) => {
-    setAccent(prev => ACCENT_OPTIONS.find(a => a.label === t.label) ?? prev)
-    setText(t.text)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ACCENT_OPTIONS])
 
   async function startRecording() {
     try {
@@ -893,7 +892,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       // Build instructions as a side-channel hint — NEVER prepended to the spoken text
       // (bracket prefixes get read aloud literally by the TTS model)
       const instructionParts: string[] = []
-      if (timbre !== 'Auto / Match') instructionParts.push(`Voice gender: ${timbre}.`)
+      // timbre removed from UI — no gender instruction added
       if (accent.value?.trim()) instructionParts.push(`Accent and dialect: ${accent.value.trim()}.`)
       if (perfStyle?.trim()) instructionParts.push(`Performance style: ${perfStyle.trim()}.`)
       if (scriptMode === 'conversation') instructionParts.push('This is a two-person conversation. Perform each speaker distinctly and do not read speaker labels aloud.')
@@ -904,7 +903,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         format,
         accentInstruction: accentInstruction || undefined,
         speed: pacing,               // API-level speed param
-        gender: timbre === 'Auto / Match' ? undefined : timbre.toLowerCase(),
+        gender: undefined,
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
 
@@ -923,7 +922,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       if (msg.includes('limit') || msg.includes('quota')) onPlans()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, text, scriptMode, format, accent, timbre, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
+  }, [user, text, scriptMode, format, accent, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
   const handleDownload = useCallback(() => {
     if (!audioBlob) return
@@ -957,18 +956,20 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
       <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
         <FieldLabel>Dialect &amp; Accent</FieldLabel>
-        <SelectField value={accent.label} onChange={v => setAccent(ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0])}
-          options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
-
-        <FieldLabel>Vocal Timbre</FieldLabel>
-        <div className="flex gap-2 flex-wrap">
-          {TIMBRE_OPTIONS.map(t => (
-            <button key={t} type="button" onClick={() => setTimbre(t)}
-              className={`timbre-btn flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all${timbre === t ? ' active' : ''}`}>
-              <UserIcon size={11} />{t}
-            </button>
-          ))}
-        </div>
+        <SelectField value={accent.label} onChange={v => {
+          const chosen = ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0]
+          setAccent(chosen)
+          // Silently wire the clone reference: find a voice whose name matches the accent label
+          const matchingVoice = voices.find(voice => voice.name.toLowerCase() === chosen.label.toLowerCase())
+          if (matchingVoice?.audioDataUrl) {
+            setReferenceDataUrl(matchingVoice.audioDataUrl)
+            setSelectedVoiceId(matchingVoice.id)
+            setReferenceTranscript('')
+          } else {
+            // No matching sample — clear any previously set clone reference from accent selection
+            if (!referenceFile) { setReferenceDataUrl(null); setSelectedVoiceId('') }
+          }
+        }} options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
 
         <FieldLabel>Performance Style</FieldLabel>
         <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
@@ -981,28 +982,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         </div>
       </Section>
 
-      {voices.length > 0 && (
-        <Section title="Sample voices" className="voices-section" icon={<AudioWaveform size={14} className="section-icon" />}>
-          <p className="text-xs studio-section-hint">Preview a studio voice, then use it for your script.</p>
-          <div className="voice-grid">
-            {voices.map(voice => (
-              <div key={voice.id} className={`voice-card${selectedVoiceId === voice.id ? ' selected' : ''}`}>
-                <button type="button"
-                  onClick={() => { setSelectedVoiceId(voice.id); setReferenceDataUrl(voice.audioDataUrl); setReferenceTranscript(''); setReferenceFile(null) }}
-                  className="voice-select">
-                  <span className="voice-avatar">{voice.name.slice(0,1).toUpperCase()}</span>
-                  <span className="min-w-0 flex-1 text-left">
-                    <span className="block text-sm font-semibold">{voice.name}</span>
-                    <span className="block text-xs opacity-70 truncate">{[voice.accent, voice.description].filter(Boolean).join(' · ') || 'VoxCraft voice'}</span>
-                  </span>
-                  {selectedVoiceId === voice.id && <CheckCircle2 size={15} />}
-                </button>
-                <audio controls preload="none" src={voice.audioDataUrl} aria-label={`Preview ${voice.name}`} />
-              </div>
-            ))}
-          </div>
-        </Section>
-      )}
+      {/* Sample voices section removed — accent selection silently clones the matching voice */}
 
       <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
         <p className="text-xs leading-relaxed studio-section-hint">
@@ -1053,36 +1033,13 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
             Write one turn per line. Example: <b>Speaker A:</b> Hello there!<br /><b>Speaker B:</b> Good to see you.
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          {SCRIPT_TEMPLATES.map(t => (
-            <button key={t.label} type="button" onClick={() => loadTemplate(t)}
-              className="rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1.5 transition-all studio-template-btn">
-              <Sparkles size={10} /> {t.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="studio-divider" />
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs flex items-center gap-1 studio-cue-label">
-            <Wand2 size={11} /> Insert Vocal Cue:
-          </span>
-          {VOCAL_CUES.map(cue => (
-            <button key={cue} type="button" onClick={() => insertCue(cue)}
-              className="rounded-lg px-2 py-1 text-xs transition-all studio-cue-btn">
-              {cue}
-            </button>
-          ))}
-        </div>
-
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
           maxLength={sc.maxChars}
           placeholder={scriptMode === 'conversation'
             ? 'Speaker A: How are you today?\nSpeaker B: I am doing well, thank you.'
-            : 'Type or paste your script here… Try inserting a vocal cue above.'}
+            : 'Type or paste your script here…'}
           rows={8}
           className="w-full rounded-2xl px-4 py-3 text-sm outline-none studio-textarea"
           onFocus={e => e.currentTarget.classList.add('focused')}
