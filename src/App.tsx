@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mic, Upload, FileText, Wand2, Play, Download, Loader2, MessageSquareText,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
-  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon,
+  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
@@ -78,6 +78,40 @@ function navigate(path: string) {
   window.history.pushState({}, '', path)
 }
 
+// ── Apply siteConfig palette to CSS custom properties ─────────────────────────
+function applyPalette(palette: SiteConfig['lightPalette'] | undefined) {
+  if (!palette) return
+  const r = document.documentElement
+  const map: [string, string][] = [
+    ['--site-bg', palette.background],
+    ['--site-surface', palette.surface],
+    ['--site-text', palette.text],
+    ['--site-muted', palette.muted],
+    ['--site-border', palette.border],
+    ['--site-accent', palette.accent],
+    // alias all other token names so every page picks them up
+    ['--bg', palette.background],
+    ['--page', palette.background],
+    ['--paper', palette.surface],
+    ['--paper-2', palette.surface],
+    ['--surface', palette.surface],
+    ['--ink', palette.text],
+    ['--ink-soft', palette.text],
+    ['--muted-ink', palette.muted],
+    ['--line', palette.border],
+    ['--border', palette.border],
+    ['--accent', palette.accent],
+    ['--accent-deep', palette.accent],
+    ['--land-bg', palette.background],
+    ['--land-panel', palette.surface],
+    ['--land-ink', palette.text],
+    ['--land-muted', palette.muted],
+    ['--land-line', palette.border],
+    ['--land-accent', palette.accent],
+  ]
+  map.forEach(([k, v]) => r.style.setProperty(k, v))
+}
+
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App(): JSX.Element {
   const { user, loading: authLoading, refresh, logout } = useAuth()
@@ -89,6 +123,7 @@ export default function App(): JSX.Element {
   const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('vc_theme') as 'light' | 'dark') || 'light')
 
+  // Sync theme attribute + fire event
   useEffect(() => {
     document.documentElement.dataset.theme = theme
     localStorage.setItem('vc_theme', theme)
@@ -98,12 +133,26 @@ export default function App(): JSX.Element {
     return () => window.removeEventListener('vc-theme-changed', syncTheme)
   }, [theme])
 
+  // Apply admin-configured palette and enforce allowThemeToggle whenever config or theme changes
+  useEffect(() => {
+    if (!siteConfig) return
+    // If theme toggle is disabled and current theme is dark, switch to light via the same
+    // mechanism the ThemeToggle uses so the vc-theme-changed event fires correctly.
+    if (!siteConfig.allowThemeToggle && theme !== 'light') {
+      document.documentElement.dataset.theme = 'light'
+      localStorage.setItem('vc_theme', 'light')
+      window.dispatchEvent(new Event('vc-theme-changed'))
+      return
+    }
+    const palette = theme === 'dark' ? siteConfig.darkPalette : siteConfig.lightPalette
+    applyPalette(palette)
+  }, [siteConfig, theme])
+
   const setPage = (p: Page) => {
     setPageState(p)
     navigate(p === 'home' ? '/' : `/${p}`)
   }
 
-  // Sync page state when browser back/forward is used
   useEffect(() => {
     const onPop = () => setPageState(pathToPage(window.location.pathname) ?? 'home')
     window.addEventListener('popstate', onPop)
@@ -111,16 +160,6 @@ export default function App(): JSX.Element {
   }, [])
 
   useEffect(() => { getPublicConfig().then(setSiteConfig).catch(() => undefined) }, [])
-
-  useEffect(() => { if (siteConfig && !siteConfig.allowThemeToggle && theme !== 'light') { setTheme('light'); localStorage.setItem('vc_theme', 'light') } }, [siteConfig, theme])
-
-  useEffect(() => {
-    if (!siteConfig) return
-    const palette = theme === 'dark' ? siteConfig.darkPalette : siteConfig.lightPalette
-    if (!palette) return
-    const root = document.documentElement
-    root.style.setProperty('--site-bg', palette.background); root.style.setProperty('--site-surface', palette.surface); root.style.setProperty('--site-text', palette.text); root.style.setProperty('--site-muted', palette.muted); root.style.setProperty('--site-border', palette.border); root.style.setProperty('--site-accent', palette.accent); root.style.setProperty('--bg', palette.background); root.style.setProperty('--page', palette.background); root.style.setProperty('--paper', palette.surface); root.style.setProperty('--paper-2', palette.surface); root.style.setProperty('--surface', palette.surface); root.style.setProperty('--ink', palette.text); root.style.setProperty('--ink-soft', palette.text); root.style.setProperty('--muted-ink', palette.muted); root.style.setProperty('--line', palette.border); root.style.setProperty('--border', palette.border); root.style.setProperty('--accent', palette.accent); root.style.setProperty('--accent-deep', palette.accent); root.style.setProperty('--land-bg', palette.background); root.style.setProperty('--land-panel', palette.surface); root.style.setProperty('--land-ink', palette.text); root.style.setProperty('--land-muted', palette.muted); root.style.setProperty('--land-line', palette.border); root.style.setProperty('--land-accent', palette.accent)
-  }, [siteConfig, theme])
 
   // Check setup status once on mount
   useEffect(() => {
@@ -147,31 +186,31 @@ export default function App(): JSX.Element {
   }, [])
 
   if (!setupChecked || authLoading) return (
-    <div className="min-h-dvh flex items-center justify-center" style={{ background: '#0a121e' }}>
-      <Loader2 size={28} className="animate-spin" style={{ color: '#20d2a0' }} />
+    <div className="min-h-dvh flex items-center justify-center" style={{ background: 'var(--page, #0a121e)' }}>
+      <Loader2 size={28} className="animate-spin" style={{ color: 'var(--accent, #20d2a0)' }} />
     </div>
   )
 
   if (kvMissing || workerDown) return (
-    <div className="min-h-dvh flex items-center justify-center px-6" style={{ background: '#0a121e' }}>
-      <div className="max-w-md w-full rounded-2xl p-8 text-center space-y-5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+    <div className="min-h-dvh flex items-center justify-center px-6" style={{ background: 'var(--page, #0a121e)' }}>
+      <div className="max-w-md w-full rounded-2xl p-8 text-center space-y-5" style={{ background: 'var(--surface, rgba(255,255,255,0.04))', border: '1px solid var(--border, rgba(255,255,255,0.08))' }}>
         <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'rgba(32,210,160,0.12)' }}>
-          <AudioWaveform size={26} style={{ color: '#20d2a0' }} />
+          <AudioWaveform size={26} style={{ color: 'var(--accent, #20d2a0)' }} />
         </div>
         {kvMissing ? (<>
-          <h2 className="text-xl font-bold" style={{ color: '#f0faf7' }}>KV Database Not Bound</h2>
-          <p className="text-sm leading-relaxed" style={{ color: 'rgba(240,250,247,0.55)' }}>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--ink, #f0faf7)' }}>KV Database Not Bound</h2>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--muted-ink, rgba(240,250,247,0.55))' }}>
             The backend is running but the KV database is not attached. Do this in your Cloudflare dashboard:
           </p>
-          <div className="text-xs rounded-xl px-4 py-4 text-left space-y-2" style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(240,250,247,0.7)' }}>
-            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>1.</span><span>Create a KV namespace named <strong>voicera-kv</strong></span></div>
-            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>2.</span><span>voicera Pages → Settings → Functions → KV namespace bindings → Add</span></div>
-            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>3.</span><span>Variable name: <code style={{ color: '#20d2a0' }}>KV</code>, select voicera-kv → Save</span></div>
-            <div className="flex gap-2"><span style={{ color: '#20d2a0' }}>4.</span><span>Deployments tab → Retry deployment</span></div>
+          <div className="text-xs rounded-xl px-4 py-4 text-left space-y-2" style={{ background: 'rgba(0,0,0,0.3)', color: 'var(--muted-ink, rgba(240,250,247,0.7))' }}>
+            <div className="flex gap-2"><span style={{ color: 'var(--accent, #20d2a0)' }}>1.</span><span>Create a KV namespace named <strong>voicera-kv</strong></span></div>
+            <div className="flex gap-2"><span style={{ color: 'var(--accent, #20d2a0)' }}>2.</span><span>voicera Pages → Settings → Functions → KV namespace bindings → Add</span></div>
+            <div className="flex gap-2"><span style={{ color: 'var(--accent, #20d2a0)' }}>3.</span><span>Variable name: <code style={{ color: 'var(--accent, #20d2a0)' }}>KV</code>, select voicera-kv → Save</span></div>
+            <div className="flex gap-2"><span style={{ color: 'var(--accent, #20d2a0)' }}>4.</span><span>Deployments tab → Retry deployment</span></div>
           </div>
         </>) : (<>
-          <h2 className="text-xl font-bold" style={{ color: '#f0faf7' }}>Cannot Reach Backend</h2>
-          <p className="text-sm leading-relaxed" style={{ color: 'rgba(240,250,247,0.55)' }}>
+          <h2 className="text-xl font-bold" style={{ color: 'var(--ink, #f0faf7)' }}>Cannot Reach Backend</h2>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--muted-ink, rgba(240,250,247,0.55))' }}>
             The API functions are not responding. Check that your Pages deployment completed successfully and the Functions tab shows compiled functions.
           </p>
         </>)}
@@ -186,7 +225,6 @@ export default function App(): JSX.Element {
     <SetupWizard onComplete={() => { setNeedsSetup(false); void refresh() }} />
   )
 
-  // Guard /admin — redirect to auth if not logged in, redirect to home if not admin
   if (page === 'admin') {
     if (!user) { setPage('auth'); return <></> }
     if (user.role !== 'admin') { setPage('home'); return <></> }
@@ -210,61 +248,330 @@ export default function App(): JSX.Element {
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-dvh" style={{ background: 'linear-gradient(160deg, #0a121e 0%, #0d1f2d 60%, #091824 100%)' }}>
+    <div className="min-h-dvh page-shell">
       {children}
     </div>
   )
 }
 
 // ── Home Page ─────────────────────────────────────────────────────────────────
-function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, siteConfig, page, onNavigate }: { allowThemeToggle?: boolean; siteConfig: SiteConfig | null; page: Page; onNavigate: (p: Page) => void; onEnter: () => void; onSignIn: () => void; user: ReturnType<typeof useAuth>['user']; onStudio: () => void }) {
+function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, siteConfig, page, onNavigate }: {
+  allowThemeToggle?: boolean
+  siteConfig: SiteConfig | null
+  page: Page
+  onNavigate: (p: Page) => void
+  onEnter: () => void
+  onSignIn: () => void
+  user: ReturnType<typeof useAuth>['user']
+  onStudio: () => void
+}) {
   const [samples, setSamples] = useState<VoiceSample[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   useEffect(() => { getVoiceSamples().then(setSamples).catch(() => setSamples([])) }, [])
+
+  // Close mobile menu on outside click
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.mobile-menu-root')) setMobileMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [mobileMenuOpen])
+
   const features = [
     { icon: Globe, title: 'Made for African voices', desc: 'Choose the cadence, accent, and character that fits your story.' },
     { icon: Mic, title: 'Bring a voice to life', desc: 'Preview curated voices or upload a short reference sample.' },
     { icon: Wand2, title: 'Direct every moment', desc: 'Add pauses, whispers, laughter, and feeling to your script.' },
     { icon: Zap, title: 'Ready for production', desc: 'Download crisp MP3 or lossless WAV right from your workspace.' },
   ]
+
   return (
     <div className="landing min-h-dvh">
-      <nav className="landing-nav">
-        <a href="/" className="brand-lockup" aria-label="VoxCraft home">{siteConfig?.logoUrl ? <img className="uploaded-brand-logo" src={siteConfig.logoUrl} alt=""/> : <span className="brand-mark"><AudioWaveform size={18} /></span>}<span>{siteConfig?.siteName || 'voxcraft'}</span><span className="brand-dot">STUDIO</span></a>
-        <div className="landing-links"><a href="#studio">Studio</a><a href="#voice-samples">Voices</a><a href="/about" onClick={e => { e.preventDefault(); onNavigate('about') }}>About</a><a href="/contact" onClick={e => { e.preventDefault(); onNavigate('contact') }}>Contact</a><a href="/plans">Pricing</a></div>
-        <div className="landing-actions"><ThemeToggle enabled={allowThemeToggle} />{user ? <button className="button button-primary" onClick={onStudio}>Open studio <ArrowRightIcon /></button> : <button className="button button-quiet" onClick={onSignIn}>Sign in</button>}</div>
+      {/* ── Navigation ── */}
+      <nav className="landing-nav mobile-menu-root">
+        <a href="/" className="brand-lockup" aria-label="VoxCraft home">
+          {siteConfig?.logoUrl
+            ? <img className="uploaded-brand-logo" src={siteConfig.logoUrl} alt="" />
+            : <span className="brand-mark"><AudioWaveform size={18} /></span>}
+          <span>{siteConfig?.siteName || 'voxcraft'}</span>
+          <span className="brand-dot">STUDIO</span>
+        </a>
+
+        {/* Desktop links */}
+        <div className="landing-links">
+          <a href="#studio">Studio</a>
+          <a href="#voice-samples">Voices</a>
+          <a href="/about" onClick={e => { e.preventDefault(); onNavigate('about') }}>About</a>
+          <a href="/contact" onClick={e => { e.preventDefault(); onNavigate('contact') }}>Contact</a>
+          <a href="/plans">Pricing</a>
+        </div>
+
+        {/* Desktop actions */}
+        <div className="landing-actions">
+          <ThemeToggle enabled={allowThemeToggle} />
+          {user
+            ? <button className="button button-primary" onClick={onStudio}>Open studio <ArrowRightIcon /></button>
+            : <>
+                <button className="button button-quiet" onClick={onSignIn}>Sign in</button>
+                <button className="button button-primary" onClick={onEnter}>Get Started <ArrowRightIcon /></button>
+              </>
+          }
+        </div>
+
+        {/* Mobile hamburger */}
+        <div className="mobile-nav-actions">
+          <ThemeToggle enabled={allowThemeToggle} />
+          <button
+            type="button"
+            className="hamburger-btn"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            onClick={() => setMobileMenuOpen(v => !v)}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+
+        {/* Mobile dropdown menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              className="mobile-menu"
+              initial={{ opacity: 0, y: -12, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.97 }}
+              transition={{ duration: 0.2 }}
+            >
+              <a href="#studio" onClick={() => setMobileMenuOpen(false)}>Studio</a>
+              <a href="#voice-samples" onClick={() => setMobileMenuOpen(false)}>Voices</a>
+              <a href="/about" onClick={e => { e.preventDefault(); setMobileMenuOpen(false); onNavigate('about') }}>About</a>
+              <a href="/contact" onClick={e => { e.preventDefault(); setMobileMenuOpen(false); onNavigate('contact') }}>Contact</a>
+              <a href="/plans" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+              <div className="mobile-menu-divider" />
+              {user
+                ? <button className="button button-primary mobile-menu-cta" onClick={() => { setMobileMenuOpen(false); onStudio() }}>Open studio <ArrowRightIcon /></button>
+                : <>
+                    <button className="button button-quiet mobile-menu-cta" onClick={() => { setMobileMenuOpen(false); onSignIn() }}>Sign in</button>
+                    <button className="button button-primary mobile-menu-cta" onClick={() => { setMobileMenuOpen(false); onEnter() }}>Get Started <ArrowRightIcon /></button>
+                  </>
+              }
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       <main>
-        {(page === 'about' || page === 'contact') ? <section className="info-page"><div className="eyebrow">VOXCRAFT STUDIO</div><h1>{page === 'about' ? 'A voice with room for every story.' : 'Let’s make something worth hearing.'}</h1><p>{page === 'about' ? 'VoxCraft helps creators shape spoken ideas with expressive voices, regional character, and a simple production workflow.' : 'Questions about your workspace, plans, or voice library? Reach our team and we’ll help you find the right next step.'}</p>{page === 'contact' && <a className="button button-primary" href={`mailto:${siteConfig?.supportEmail || 'support@voxcraft.ai'}`}>Email {siteConfig?.supportEmail || 'support@voxcraft.ai'} <ArrowRightIcon /></a>}</section> : <>
-        <section className="hero-section" id="studio">
-          <div className="hero-copy">
-            <div className="eyebrow"><span className="live-dot" /> VOICE, WITH A POINT OF VIEW</div>
-            <h1>Give your words<br />a <em>voice of their own.</em></h1>
-            <p className="hero-lede">A thoughtful voice studio for stories, conversations, and ideas shaped by the sounds of Africa and beyond.</p>
-            <div className="hero-ctas"><button className="button button-primary button-large" onClick={onEnter}>Open the studio <ArrowRightIcon /></button><a className="text-link" href="#voices">Explore the voices <span>↓</span></a></div>
-            <div className="hero-proof"><div className="avatar-stack"><span>AM</span><span>KO</span><span>ZE</span></div><span>Made for the way we speak.</span><span className="proof-sep">·</span><span>Built for the world.</span></div>
-          </div>
-          <div className="hero-art" aria-label="VoxCraft audio studio preview">
-            <div className="art-glow" />
-            <div className="studio-preview"><div className="preview-top"><span className="preview-window-dots"><i/><i/><i/></span><span>VOXCRAFT · SESSION 01</span><span className="preview-status"><i/> READY</span></div>
-              <div className="preview-content"><div className="preview-label">YOUR NEXT STORY, IN SOUND</div><div className="preview-title">The morning<br />comes alive.</div><div className="waveform">{Array.from({length: 46}, (_, i) => <i key={i} style={{ height: `${18 + ((i * 37 + 13) % 62)}%` }} />)}</div><div className="preview-player"><button className="play-orb" onClick={onEnter} aria-label="Open studio"><Play size={15} fill="currentColor" /></button><div className="preview-track"><b>Amara · Lagos Executive</b><span>Warm, clear · 0:18</span></div><span className="track-time">00:18</span></div></div>
-              <div className="preview-footer"><span><AudioWaveform size={13}/> FISH AUDIO ENGINE</span><span>MP3 · 44.1 KHZ</span></div>
+        {(page === 'about' || page === 'contact') ? (
+          <section className="info-page">
+            <div className="eyebrow">VOXCRAFT STUDIO</div>
+            <h1>{page === 'about' ? 'A voice with room for every story.' : "Let\u2019s make something worth hearing."}</h1>
+            <p>{page === 'about'
+              ? 'VoxCraft helps creators shape spoken ideas with expressive voices, regional character, and a simple production workflow.'
+              : "Questions about your workspace, plans, or voice library? Reach our team and we\u2019ll help you find the right next step."
+            }</p>
+            {page === 'contact' && (
+              <a className="button button-primary" href={`mailto:${siteConfig?.supportEmail || 'support@voxcraft.ai'}`}>
+                Email {siteConfig?.supportEmail || 'support@voxcraft.ai'} <ArrowRightIcon />
+              </a>
+            )}
+          </section>
+        ) : <>
+          {/* ── Hero ── */}
+          <section className="hero-section" id="studio">
+            <motion.div
+              className="hero-copy"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="eyebrow"><span className="live-dot" /> VOICE, WITH A POINT OF VIEW</div>
+              <h1>Give your words<br />a <em>voice of their own.</em></h1>
+              <p className="hero-lede">A thoughtful voice studio for stories, conversations, and ideas shaped by the sounds of Africa and beyond.</p>
+              <div className="hero-ctas">
+                <button className="button button-primary button-large" onClick={onEnter}>
+                  Get Started Free <ArrowRightIcon />
+                </button>
+                <a className="text-link" href="#voices">Explore the voices <span>↓</span></a>
+              </div>
+              <div className="hero-proof">
+                <div className="avatar-stack"><span>AM</span><span>KO</span><span>ZE</span></div>
+                <span>Made for the way we speak.</span>
+                <span className="proof-sep">·</span>
+                <span>Built for the world.</span>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="hero-art"
+              aria-label="VoxCraft audio studio preview"
+              initial={{ opacity: 0, x: 30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="art-glow" />
+              <div className="studio-preview">
+                <div className="preview-top">
+                  <span className="preview-window-dots"><i/><i/><i/></span>
+                  <span>VOXCRAFT · SESSION 01</span>
+                  <span className="preview-status"><i/> READY</span>
+                </div>
+                <div className="preview-content">
+                  <div className="preview-label">YOUR NEXT STORY, IN SOUND</div>
+                  <div className="preview-title">The morning<br />comes alive.</div>
+                  <div className="waveform">
+                    {Array.from({ length: 46 }, (_, i) => (
+                      <i key={i} style={{ height: `${18 + ((i * 37 + 13) % 62)}%` }} />
+                    ))}
+                  </div>
+                  <div className="preview-player">
+                    <button className="play-orb" onClick={onEnter} aria-label="Open studio">
+                      <Play size={15} fill="currentColor" />
+                    </button>
+                    <div className="preview-track">
+                      <b>Amara · Lagos Executive</b>
+                      <span>Warm, clear · 0:18</span>
+                    </div>
+                    <span className="track-time">00:18</span>
+                  </div>
+                </div>
+                <div className="preview-footer">
+                  <span><AudioWaveform size={13}/> FISH AUDIO ENGINE</span>
+                  <span>MP3 · 44.1 KHZ</span>
+                </div>
+              </div>
+              <div className="floating-note">
+                <span className="note-icon"><Sparkles size={14}/></span>
+                <span><b>Every accent, intentional.</b><small>Find the right sound.</small></span>
+              </div>
+            </motion.div>
+          </section>
+
+          {/* ── Ticker strip ── */}
+          <section className="signal-strip">
+            <span>VOICE FOR</span>
+            <b>Films &amp; stories</b><i/>
+            <b>Learning</b><i/>
+            <b>Creators</b><i/>
+            <b>Brands</b><i/>
+            <b>Everyday ideas</b>
+          </section>
+
+          {/* ── Voice samples ── */}
+          {samples.length > 0 && (
+            <section className="samples-section" id="voice-samples">
+              <div className="section-heading">
+                <div>
+                  <div className="eyebrow">MEET THE VOICES</div>
+                  <h2>Hear the voice<br/><em>before the story.</em></h2>
+                </div>
+                <p>Preview voices from the VoxCraft library and take your favorite into the studio.</p>
+              </div>
+              <div className="sample-grid">
+                {samples.map(sample => (
+                  <motion.article
+                    className="sample-card"
+                    key={sample.id}
+                    initial={{ opacity: 0, y: 16 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.45 }}
+                  >
+                    <div className="sample-card-head">
+                      <span className="sample-avatar">{sample.name.slice(0,1).toUpperCase()}</span>
+                      <div>
+                        <b>{sample.name}</b>
+                        <small>{sample.accent}</small>
+                      </div>
+                      <span className="sample-wave">〰</span>
+                    </div>
+                    <p>{sample.description || 'A voice ready for your next idea.'}</p>
+                    <audio controls preload="none" src={sample.audioDataUrl}/>
+                    <button className="sample-use" onClick={onStudio}>Use this voice <ArrowRightIcon/></button>
+                  </motion.article>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── Features ── */}
+          <section className="features-section" id="voices">
+            <div className="section-heading">
+              <div>
+                <div className="eyebrow">A STUDIO THAT GETS IT</div>
+                <h2>More than words.<br /><em>All the feeling between them.</em></h2>
+              </div>
+              <p>From the first line to the final listen, shape the sound until it feels like yours.</p>
             </div>
-            <div className="floating-note"><span className="note-icon"><Sparkles size={14}/></span><span><b>Every accent, intentional.</b><small>Find the right sound.</small></span></div>
-          </div>
-        </section>
+            <div className="feature-grid">
+              {features.map((f, i) => (
+                <motion.article
+                  key={f.title}
+                  className="feature-card"
+                  initial={{ opacity: 0, y: 14 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.07 }}
+                >
+                  <span className="feature-number">0{i + 1}</span>
+                  <span className="feature-icon"><f.icon size={18}/></span>
+                  <h3>{f.title}</h3>
+                  <p>{f.desc}</p>
+                </motion.article>
+              ))}
+            </div>
+          </section>
 
-        <section className="signal-strip"><span>VOICE FOR</span><b>Films & stories</b><i/><b>Learning</b><i/><b>Creators</b><i/><b>Brands</b><i/><b>Everyday ideas</b></section>
+          {/* ── Workflow ── */}
+          <section className="workflow-section" id="workflow">
+            <div className="workflow-copy">
+              <div className="eyebrow">FROM PAGE TO PLAY</div>
+              <h2>Your next idea<br />sounds <em>closer.</em></h2>
+              <p>Choose a voice, bring your script, and direct the delivery. VoxCraft takes care of the rest, with controls that stay out of your way.</p>
+              <button className="button button-primary" onClick={onEnter}>Start creating <ArrowRightIcon /></button>
+            </div>
+            <div className="workflow-steps">
+              <div><span>01</span><b>Choose your voice</b><small>Preview samples and find a natural fit.</small></div>
+              <div><span>02</span><b>Shape the delivery</b><small>Set the pace, mood, and vocal cues.</small></div>
+              <div><span>03</span><b>Make it yours</b><small>Synthesize and take your audio anywhere.</small></div>
+            </div>
+          </section>
 
-        {samples.length > 0 && <section className="samples-section" id="voice-samples"><div className="section-heading"><div><div className="eyebrow">MEET THE VOICES</div><h2>Hear the voice<br/><em>before the story.</em></h2></div><p>Preview voices from the VoxCraft library and take your favorite into the studio.</p></div><div className="sample-grid">{samples.map(sample => <article className="sample-card" key={sample.id}><div className="sample-card-head"><span className="sample-avatar">{sample.name.slice(0,1).toUpperCase()}</span><div><b>{sample.name}</b><small>{sample.accent}</small></div><span className="sample-wave">〰</span></div><p>{sample.description || 'A voice ready for your next idea.'}</p><audio controls preload="none" src={sample.audioDataUrl}/><button className="sample-use" onClick={onStudio}>Use this voice <ArrowRightIcon/></button></article>)}</div></section>}
-        <section className="features-section" id="voices"><div className="section-heading"><div><div className="eyebrow">A STUDIO THAT GETS IT</div><h2>More than words.<br /><em>All the feeling between them.</em></h2></div><p>From the first line to the final listen, shape the sound until it feels like yours.</p></div><div className="feature-grid">{features.map((f, i) => <motion.article key={f.title} className="feature-card" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * .07 }}><span className="feature-number">0{i + 1}</span><span className="feature-icon"><f.icon size={18}/></span><h3>{f.title}</h3><p>{f.desc}</p></motion.article>)}</div></section>
-
-        <section className="workflow-section" id="workflow"><div className="workflow-copy"><div className="eyebrow">FROM PAGE TO PLAY</div><h2>Your next idea<br />sounds <em>closer.</em></h2><p>Choose a voice, bring your script, and direct the delivery. VoxCraft takes care of the rest, with controls that stay out of your way.</p><button className="button button-primary" onClick={onEnter}>Start creating <ArrowRightIcon /></button></div><div className="workflow-steps"><div><span>01</span><b>Choose your voice</b><small>Preview samples and find a natural fit.</small></div><div><span>02</span><b>Shape the delivery</b><small>Set the pace, mood, and vocal cues.</small></div><div><span>03</span><b>Make it yours</b><small>Synthesize and take your audio anywhere.</small></div></div></section>
-
-        <section className="closing-cta"><div><div className="eyebrow">SOUND LIKE YOURSELF</div><h2>There’s a voice for that.</h2><p>Make something people want to listen to.</p></div><button className="button button-dark" onClick={onEnter}>Step into the studio <ArrowRightIcon /></button></section>
+          {/* ── CTA band ── */}
+          <section className="closing-cta">
+            <div>
+              <div className="eyebrow">SOUND LIKE YOURSELF</div>
+              <h2>There's a voice for that.</h2>
+              <p>Make something people want to listen to.</p>
+            </div>
+            <div className="cta-band-actions">
+              <button className="button button-primary button-large" onClick={onEnter}>
+                Get Started Free <ArrowRightIcon />
+              </button>
+              <button className="button button-dark" onClick={onEnter}>
+                Step into the studio <ArrowRightIcon />
+              </button>
+            </div>
+          </section>
         </>}
       </main>
-      <footer className="landing-footer"><a href="/" className="brand-lockup">{siteConfig?.logoUrl ? <img className="uploaded-brand-logo" src={siteConfig.logoUrl} alt=""/> : <span className="brand-mark"><AudioWaveform size={16}/></span>}<span>{siteConfig?.siteName || 'voxcraft'}</span></a><span>Voice, with a point of view.</span><div className="footer-links"><button onClick={() => onNavigate('about')}>About</button><button onClick={() => onNavigate('contact')}>Contact</button><button onClick={() => onNavigate('plans')}>Pricing</button><button onClick={onSignIn}>Your workspace <ArrowRightIcon /></button></div></footer>
+
+      <footer className="landing-footer">
+        <a href="/" className="brand-lockup">
+          {siteConfig?.logoUrl
+            ? <img className="uploaded-brand-logo" src={siteConfig.logoUrl} alt="" />
+            : <span className="brand-mark"><AudioWaveform size={16}/></span>}
+          <span>{siteConfig?.siteName || 'voxcraft'}</span>
+        </a>
+        <span>Voice, with a point of view.</span>
+        <div className="footer-links">
+          <button onClick={() => onNavigate('about')}>About</button>
+          <button onClick={() => onNavigate('contact')}>Contact</button>
+          <button onClick={() => onNavigate('plans')}>Pricing</button>
+          <button onClick={onSignIn}>Your workspace <ArrowRightIcon /></button>
+        </div>
+      </footer>
     </div>
   )
 }
@@ -281,33 +588,29 @@ function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = tru
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <header className="sticky top-0 z-40 flex items-center justify-between px-4 py-3"
-      style={{ background: 'rgba(10,18,30,0.92)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(16px)' }}>
+    <header className="studio-topbar">
       <div className="flex items-center gap-2.5">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)' }}>
-          <AudioWaveform size={16} color="#0a121e" strokeWidth={2.5} />
+        <div className="studio-logo-mark">
+          <AudioWaveform size={16} strokeWidth={2.5} />
         </div>
-        <span className="display font-bold text-sm" style={{ color: '#f0faf7' }}>VoxCraft</span>
-        <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(32,210,160,0.12)', color: '#20d2a0', border: '1px solid rgba(32,210,160,0.25)' }}>Studio Pro</span>
+        <span className="display font-bold text-sm studio-topbar-brand">VoxCraft</span>
+        <span className="studio-badge">Studio Pro</span>
       </div>
 
       <div className="flex items-center gap-2">
         <ThemeToggle enabled={allowThemeToggle} />
-        <div className="hidden sm:flex items-center gap-1.5 text-xs" style={{ color: 'rgba(240,250,247,0.5)' }}>
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#20d2a0', boxShadow: '0 0 6px #20d2a0' }} />
+        <div className="hidden sm:flex items-center gap-1.5 text-xs studio-engine-status">
+          <div className="studio-engine-dot" />
           Acoustic Engine Ready
         </div>
 
         {user ? (
           <div className="relative">
             <button type="button" onClick={() => setMenuOpen(v => !v)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#f0faf7' }}>
+              className="studio-user-btn flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs">
               {user.avatar
                 ? <img src={user.avatar} alt="" className="w-5 h-5 rounded-full" />
-                : <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ background: 'rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+                : <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold studio-user-avatar">
                     {user.name.charAt(0)}
                   </div>}
               {user.name.split(' ')[0]}
@@ -319,13 +622,11 @@ function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = tru
                   initial={{ opacity: 0, y: -8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                  className="absolute right-0 top-full mt-2 w-48 rounded-2xl overflow-hidden py-1 z-50"
-                  style={{ background: '#0d1f2d', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
-                  <div className="px-3 py-2 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                    <div className="text-xs font-medium truncate" style={{ color: '#f0faf7' }}>{user.name}</div>
-                    <div className="text-xs truncate mt-0.5" style={{ color: 'rgba(240,250,247,0.4)' }}>{user.email}</div>
-                    <div className="text-xs mt-1 capitalize inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md"
-                      style={{ background: 'rgba(32,210,160,0.1)', color: '#20d2a0' }}>
+                  className="absolute right-0 top-full mt-2 w-48 rounded-2xl overflow-hidden py-1 z-50 studio-dropdown">
+                  <div className="px-3 py-2 studio-dropdown-header">
+                    <div className="text-xs font-medium truncate studio-dropdown-name">{user.name}</div>
+                    <div className="text-xs truncate mt-0.5 studio-dropdown-email">{user.email}</div>
+                    <div className="text-xs mt-1 capitalize inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md studio-plan-badge">
                       <Crown size={9} /> {user.plan}
                     </div>
                   </div>
@@ -347,8 +648,8 @@ function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = tru
 function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
   return (
     <button type="button" onClick={onClick}
-      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5"
-      style={{ color: danger ? '#ff6b8a' : 'rgba(240,250,247,0.7)' }}>
+      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs transition-colors hover:bg-white/5 studio-menu-item"
+      data-danger={danger ? 'true' : undefined}>
       {icon}
       {label}
     </button>
@@ -387,7 +688,6 @@ function StudioBody({ user, onSignIn, onPlans }: {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const startTimeRef = useRef<number>(0)
 
-  // Load usage on mount / user change
   useEffect(() => {
     getVoiceSamples().then(setVoices).catch(() => null)
   }, [])
@@ -481,7 +781,9 @@ function StudioBody({ user, onSignIn, onPlans }: {
       ].filter(Boolean).join(' ')
 
       const { blob, remaining } = await synthesize({
-        text: scriptMode === 'conversation' ? `[Two-person conversation. Perform each speaker's lines distinctly and do not read speaker labels aloud.]\n${text.trim()}` : text.trim(),
+        text: scriptMode === 'conversation'
+          ? `[Two-person conversation. Perform each speaker's lines distinctly and do not read speaker labels aloud.]\n${text.trim()}`
+          : text.trim(),
         format,
         accentInstruction,
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
@@ -515,29 +817,26 @@ function StudioBody({ user, onSignIn, onPlans }: {
 
   return (
     <div className="studio-layout mx-auto px-4 pb-16 pt-4 space-y-4">
-      {/* Usage bar */}
       {user && usage && (
-        <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+        <div className="rounded-2xl px-4 py-3 studio-usage-bar">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium" style={{ color: 'rgba(240,250,247,0.6)' }}>Daily Usage</span>
+            <span className="text-xs font-medium studio-usage-label">Daily Usage</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs tabular-nums" style={{ color: '#f0faf7' }}>{usage.tokensUsed.toLocaleString()} / {usage.limit.toLocaleString()} chars</span>
-              <button type="button" onClick={onPlans} className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1"
-                style={{ background: 'rgba(32,210,160,0.12)', color: '#20d2a0' }}>
+              <span className="text-xs tabular-nums studio-usage-count">{usage.tokensUsed.toLocaleString()} / {usage.limit.toLocaleString()} chars</span>
+              <button type="button" onClick={onPlans} className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1 studio-upgrade-btn">
                 <Crown size={9} /> Upgrade
               </button>
             </div>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+          <div className="h-1.5 rounded-full overflow-hidden studio-usage-track">
             <div className="h-full rounded-full transition-all"
-              style={{ width: `${limitPct}%`, background: limitPct > 85 ? '#ff6b8a' : 'linear-gradient(90deg, #20d2a0, #0ea882)' }} />
+              style={{ width: `${limitPct}%`, background: limitPct > 85 ? '#ff6b8a' : 'linear-gradient(90deg, var(--accent, #20d2a0), var(--accent-hover, #0ea882))' }} />
           </div>
         </div>
       )}
 
-      {/* Vocal Profile */}
-      <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} style={{ color: '#20d2a0' }} />}>
-        <FieldLabel>Dialect & Accent</FieldLabel>
+      <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
+        <FieldLabel>Dialect &amp; Accent</FieldLabel>
         <SelectField value={accent.label} onChange={v => setAccent(ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0])}
           options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
 
@@ -545,10 +844,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
         <div className="flex gap-2">
           {TIMBRE_OPTIONS.map(t => (
             <button key={t} type="button" onClick={() => setTimbre(t)}
-              className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-              style={timbre === t
-                ? { background: 'rgba(32,210,160,0.15)', border: '1px solid rgba(32,210,160,0.4)', color: '#20d2a0' }
-                : { background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(240,250,247,0.5)' }}>
+              className={`timbre-btn flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all${timbre === t ? ' active' : ''}`}>
               <UserIcon size={11} />{t}
             </button>
           ))}
@@ -559,9 +855,9 @@ function StudioBody({ user, onSignIn, onPlans }: {
 
         <div className="flex items-end gap-4">
           <div className="flex-1">
-            <FieldLabel>Pacing <span className="tabular-nums" style={{ color: '#20d2a0' }}>{pacing.toFixed(2)}x</span></FieldLabel>
+            <FieldLabel>Pacing <span className="tabular-nums pacing-val">{pacing.toFixed(2)}x</span></FieldLabel>
             <input type="range" min={0.5} max={2.0} step={0.05} value={pacing} onChange={e => setPacing(Number(e.target.value))}
-              className="w-full accent-teal-400 h-1 rounded-full" style={{ accentColor: '#20d2a0' }} />
+              className="w-full h-1 rounded-full studio-range" />
           </div>
           <div className="w-40">
             <FieldLabel>Master Format</FieldLabel>
@@ -570,17 +866,36 @@ function StudioBody({ user, onSignIn, onPlans }: {
         </div>
       </Section>
 
-      {voices.length > 0 && <Section title="Sample voices" className="voices-section" icon={<AudioWaveform size={14} style={{ color: '#20d2a0' }} />}><p className="text-xs" style={{ color: 'rgba(240,250,247,0.45)' }}>Preview a studio voice, then use it for your script.</p><div className="voice-grid">{voices.map(voice => <div key={voice.id} className={`voice-card ${selectedVoiceId === voice.id ? 'selected' : ''}`}><button type="button" onClick={() => { setSelectedVoiceId(voice.id); setReferenceDataUrl(voice.audioDataUrl); setReferenceTranscript(''); setReferenceFile(null) }} className="voice-select"><span className="voice-avatar">{voice.name.slice(0,1).toUpperCase()}</span><span className="min-w-0 flex-1 text-left"><span className="block text-sm font-semibold">{voice.name}</span><span className="block text-xs opacity-70 truncate">{[voice.accent, voice.description].filter(Boolean).join(' · ') || 'VoxCraft voice'}</span></span>{selectedVoiceId === voice.id && <CheckCircle2 size={15} />}</button><audio controls preload="none" src={voice.audioDataUrl} aria-label={`Preview ${voice.name}`} /></div>)}</div></Section>}
+      {voices.length > 0 && (
+        <Section title="Sample voices" className="voices-section" icon={<AudioWaveform size={14} className="section-icon" />}>
+          <p className="text-xs studio-section-hint">Preview a studio voice, then use it for your script.</p>
+          <div className="voice-grid">
+            {voices.map(voice => (
+              <div key={voice.id} className={`voice-card${selectedVoiceId === voice.id ? ' selected' : ''}`}>
+                <button type="button"
+                  onClick={() => { setSelectedVoiceId(voice.id); setReferenceDataUrl(voice.audioDataUrl); setReferenceTranscript(''); setReferenceFile(null) }}
+                  className="voice-select">
+                  <span className="voice-avatar">{voice.name.slice(0,1).toUpperCase()}</span>
+                  <span className="min-w-0 flex-1 text-left">
+                    <span className="block text-sm font-semibold">{voice.name}</span>
+                    <span className="block text-xs opacity-70 truncate">{[voice.accent, voice.description].filter(Boolean).join(' · ') || 'VoxCraft voice'}</span>
+                  </span>
+                  {selectedVoiceId === voice.id && <CheckCircle2 size={15} />}
+                </button>
+                <audio controls preload="none" src={voice.audioDataUrl} aria-label={`Preview ${voice.name}`} />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
-      {/* Voice Cloning */}
-      <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} style={{ color: '#20d2a0' }} />}>
-        <p className="text-xs leading-relaxed" style={{ color: 'rgba(240,250,247,0.45)' }}>
-          Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker's vocal identity and native inflection.
+      <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
+        <p className="text-xs leading-relaxed studio-section-hint">
+          Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker's vocal identity.
         </p>
 
         {referenceFile && (
-          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs"
-            style={{ background: 'rgba(32,210,160,0.08)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs studio-ref-file">
             <CheckCircle2 size={13} />
             <span className="truncate flex-1">{referenceFile.name}</span>
             <button type="button" onClick={() => { setReferenceFile(null); setReferenceDataUrl(null); setSelectedVoiceId('') }}>
@@ -594,23 +909,18 @@ function StudioBody({ user, onSignIn, onPlans }: {
             <FieldLabel>Reference Transcript (optional)</FieldLabel>
             <input type="text" value={referenceTranscript} onChange={e => setReferenceTranscript(e.target.value)}
               placeholder="What the speaker says in the recording…"
-              className="w-full rounded-xl px-3 py-2.5 text-xs outline-none border"
-              style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }} />
+              className="w-full rounded-xl px-3 py-2.5 text-xs outline-none studio-text-input" />
           </div>
         )}
 
         <div className="flex gap-2">
           <button type="button"
             onClick={() => { if (isRecording) stopRecording(); else void startRecording() }}
-            className="flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-all"
-            style={isRecording
-              ? { background: 'rgba(255,107,138,0.15)', border: '1px solid rgba(255,107,138,0.35)', color: '#ff6b8a' }
-              : { background: 'rgba(186,43,76,0.15)', border: '1px solid rgba(186,43,76,0.3)', color: '#ff6b8a' }}>
+            className={`flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-all studio-record-btn${isRecording ? ' recording' : ''}`}>
             <Mic size={15} />
             {isRecording ? 'Stop Recording' : 'Record Microphone'}
           </button>
-          <label className="flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all"
-            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(240,250,247,0.7)' }}>
+          <label className="flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all studio-upload-btn">
             <Upload size={15} />
             Import Audio Clip
             <input type="file" accept="audio/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
@@ -618,30 +928,34 @@ function StudioBody({ user, onSignIn, onPlans }: {
         </div>
       </Section>
 
-      {/* Script Editor */}
-      <Section title="Studio Script Editor" className="script-section" icon={<FileText size={14} style={{ color: '#20d2a0' }} />}>
-        <div className="mode-switch"><button type="button" className={scriptMode === 'narration' ? 'active' : ''} onClick={() => setScriptMode('narration')}><FileText size={13} /> Narration</button><button type="button" className={scriptMode === 'conversation' ? 'active' : ''} onClick={() => setScriptMode('conversation')}><MessageSquareText size={13} /> Conversation</button></div>
-        {scriptMode === 'conversation' && <div className="dialogue-hint">Write one turn per line. Example: <b>Speaker A:</b> Hello there!<br /><b>Speaker B:</b> Good to see you.</div>}
+      <Section title="Studio Script Editor" className="script-section" icon={<FileText size={14} className="section-icon" />}>
+        <div className="mode-switch">
+          <button type="button" className={scriptMode === 'narration' ? 'active' : ''} onClick={() => setScriptMode('narration')}><FileText size={13} /> Narration</button>
+          <button type="button" className={scriptMode === 'conversation' ? 'active' : ''} onClick={() => setScriptMode('conversation')}><MessageSquareText size={13} /> Conversation</button>
+        </div>
+        {scriptMode === 'conversation' && (
+          <div className="dialogue-hint">
+            Write one turn per line. Example: <b>Speaker A:</b> Hello there!<br /><b>Speaker B:</b> Good to see you.
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           {SCRIPT_TEMPLATES.map(t => (
             <button key={t.label} type="button" onClick={() => loadTemplate(t)}
-              className="rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1.5 transition-all"
-              style={{ background: 'rgba(32,210,160,0.1)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
+              className="rounded-full px-3 py-1 text-xs font-medium flex items-center gap-1.5 transition-all studio-template-btn">
               <Sparkles size={10} /> {t.label}
             </button>
           ))}
         </div>
 
-        <div className="h-px my-1" style={{ background: 'rgba(255,255,255,0.06)' }} />
+        <div className="studio-divider" />
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs flex items-center gap-1" style={{ color: 'rgba(240,250,247,0.4)' }}>
+          <span className="text-xs flex items-center gap-1 studio-cue-label">
             <Wand2 size={11} /> Insert Vocal Cue:
           </span>
           {VOCAL_CUES.map(cue => (
             <button key={cue} type="button" onClick={() => insertCue(cue)}
-              className="rounded-lg px-2 py-1 text-xs transition-all"
-              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: 'rgba(240,250,247,0.6)' }}>
+              className="rounded-lg px-2 py-1 text-xs transition-all studio-cue-btn">
               {cue}
             </button>
           ))}
@@ -651,72 +965,63 @@ function StudioBody({ user, onSignIn, onPlans }: {
           value={text}
           onChange={e => setText(e.target.value)}
           maxLength={3000}
-          placeholder={scriptMode === 'conversation' ? 'Speaker A: How are you today?\nSpeaker B: I am doing well, thank you.' : 'Type or paste your script here… Try inserting a vocal cue above.'}
+          placeholder={scriptMode === 'conversation'
+            ? 'Speaker A: How are you today?\nSpeaker B: I am doing well, thank you.'
+            : 'Type or paste your script here… Try inserting a vocal cue above.'}
           rows={8}
-          className="w-full rounded-2xl px-4 py-3 text-sm outline-none border resize-y leading-relaxed"
-          style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,255,255,0.08)', color: '#f0faf7', fontFamily: 'inherit', minHeight: 160 }}
-          onFocus={e => { e.currentTarget.style.borderColor = 'rgba(32,210,160,0.35)' }}
-          onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)' }}
+          className="w-full rounded-2xl px-4 py-3 text-sm outline-none studio-textarea"
+          onFocus={e => e.currentTarget.classList.add('focused')}
+          onBlur={e => e.currentTarget.classList.remove('focused')}
         />
 
         <div className="flex items-center justify-between -mt-1">
-          <span className="text-xs tabular-nums" style={{ color: 'rgba(240,250,247,0.35)' }}>{charsUsed} / 3,000 characters</span>
-          <button type="button" onClick={() => setText('')} className="text-xs flex items-center gap-1 transition-colors"
-            style={{ color: 'rgba(240,250,247,0.35)' }}>
+          <span className="text-xs tabular-nums studio-char-count">{charsUsed} / 3,000 characters</span>
+          <button type="button" onClick={() => setText('')} className="text-xs flex items-center gap-1 transition-colors studio-clear-btn">
             <X size={11} /> Clear Script
           </button>
         </div>
 
-        {/* Error */}
         <AnimatePresence>
           {status === 'error' && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-              className="rounded-xl px-3 py-2.5 flex items-start gap-2 text-xs"
-              style={{ background: 'rgba(255,107,138,0.1)', border: '1px solid rgba(255,107,138,0.25)', color: '#ff6b8a' }}>
+              className="rounded-xl px-3 py-2.5 flex items-start gap-2 text-xs studio-error-msg">
               <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
               <span>{errorMsg}</span>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Synthesize CTA */}
         <button type="button" disabled={!text.trim() || status === 'loading'}
           onClick={() => { void handleSynthesize() }}
-          className="w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all"
-          style={!text.trim() || status === 'loading'
-            ? { background: 'rgba(32,210,160,0.15)', color: 'rgba(32,210,160,0.4)', cursor: 'not-allowed' }
-            : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e', boxShadow: '0 0 24px rgba(32,210,160,0.2)' }}>
+          className={`w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all studio-synth-btn${!text.trim() || status === 'loading' ? ' disabled' : ''}`}>
           {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <AudioWaveform size={18} />}
           {status === 'loading' ? 'Synthesizing Master Audio…' : 'Synthesize Studio Audio'}
         </button>
 
-        {/* Progress card */}
         <AnimatePresence>
           {status === 'loading' && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
-              className="rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              className="rounded-2xl p-4 studio-progress-card">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2 text-xs" style={{ color: 'rgba(240,250,247,0.7)' }}>
-                  <Loader2 size={12} className="animate-spin" style={{ color: '#20d2a0' }} />
+                <div className="flex items-center gap-2 text-xs studio-progress-desc">
+                  <Loader2 size={12} className="animate-spin studio-spinner" />
                   {SYNTHESIS_STAGES[stageIndex]?.desc}
                 </div>
-                <div className="text-xs tabular-nums" style={{ color: 'rgba(240,250,247,0.5)' }}>
+                <div className="text-xs tabular-nums studio-progress-time">
                   {(elapsedMs / 1000).toFixed(1)}s{' '}
-                  <span style={{ color: '#20d2a0' }}>{stageProgress}%</span>
+                  <span className="studio-progress-pct">{stageProgress}%</span>
                 </div>
               </div>
-              <div className="h-1 rounded-full overflow-hidden mb-3" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                <div className="h-full rounded-full transition-all"
-                  style={{ width: `${(stageIndex / SYNTHESIS_STAGES.length) * 100 + stageProgress / SYNTHESIS_STAGES.length}%`, background: 'linear-gradient(90deg, #20d2a0, #0ea882)' }} />
+              <div className="h-1 rounded-full overflow-hidden mb-3 studio-progress-track">
+                <div className="h-full rounded-full transition-all studio-progress-fill"
+                  style={{ width: `${(stageIndex / SYNTHESIS_STAGES.length) * 100 + stageProgress / SYNTHESIS_STAGES.length}%` }} />
               </div>
               <div className="flex items-center gap-3 flex-wrap">
                 {SYNTHESIS_STAGES.map((s, i) => (
-                  <div key={s.label} className="flex items-center gap-1 text-xs"
-                    style={{ color: i < stageIndex ? '#20d2a0' : i === stageIndex ? '#f0faf7' : 'rgba(240,250,247,0.3)' }}>
+                  <div key={s.label} className={`flex items-center gap-1 text-xs studio-stage${i < stageIndex ? ' done' : i === stageIndex ? ' active' : ' pending'}`}>
                     {i < stageIndex
-                      ? <CheckCircle2 size={10} style={{ color: '#20d2a0' }} />
-                      : <div className={`w-2.5 h-2.5 rounded-full border ${i === stageIndex ? 'border-teal-400' : 'border-white/20'}`}
-                          style={i === stageIndex ? { borderColor: '#20d2a0' } : {}} />}
+                      ? <CheckCircle2 size={10} />
+                      : <div className={`w-2.5 h-2.5 rounded-full border studio-stage-dot${i === stageIndex ? ' active' : ''}`} />}
                     {s.label}
                   </div>
                 ))}
@@ -725,31 +1030,26 @@ function StudioBody({ user, onSignIn, onPlans }: {
           )}
         </AnimatePresence>
 
-        {/* Audio player */}
         <AnimatePresence>
           {status === 'success' && audioUrl && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="rounded-2xl p-4" style={{ background: 'rgba(32,210,160,0.06)', border: '1px solid rgba(32,210,160,0.2)' }}>
+              className="rounded-2xl p-4 studio-audio-card">
               <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 size={14} style={{ color: '#20d2a0' }} />
-                <span className="text-sm font-semibold" style={{ color: '#f0faf7' }}>Audio Ready</span>
+                <CheckCircle2 size={14} className="studio-check-icon" />
+                <span className="text-sm font-semibold studio-audio-ready">Audio Ready</span>
               </div>
-              <audio ref={audioRef} src={audioUrl} controls className="w-full mb-3"
-                style={{ borderRadius: 8, height: 36 }} />
+              <audio ref={audioRef} src={audioUrl} controls className="w-full mb-3" style={{ borderRadius: 8, height: 36 }} />
               <div className="flex gap-2">
                 <button type="button" onClick={() => { void audioRef.current?.play() }}
-                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                  style={{ background: 'rgba(32,210,160,0.1)', border: '1px solid rgba(32,210,160,0.25)', color: '#20d2a0' }}>
+                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-play-btn">
                   <Play size={12} /> Play
                 </button>
                 <button type="button" onClick={handleDownload}
-                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
-                  style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
+                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-download-btn">
                   <Download size={12} /> Download {format.toUpperCase()}
                 </button>
                 <button type="button" onClick={() => { setStatus('idle'); setAudioUrl(null); setAudioBlob(null) }}
-                  className="rounded-xl px-3 py-2.5 text-xs transition-all"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(240,250,247,0.5)' }}>
+                  className="rounded-xl px-3 py-2.5 text-xs transition-all studio-close-btn">
                   <X size={13} />
                 </button>
               </div>
@@ -757,13 +1057,11 @@ function StudioBody({ user, onSignIn, onPlans }: {
           )}
         </AnimatePresence>
 
-        {/* Guest CTA */}
         {!user && (
-          <div className="rounded-2xl p-4 text-center" style={{ background: 'rgba(32,210,160,0.05)', border: '1px solid rgba(32,210,160,0.15)' }}>
-            <p className="text-xs mb-3" style={{ color: 'rgba(240,250,247,0.55)' }}>Sign in to synthesize audio and track your usage.</p>
+          <div className="rounded-2xl p-4 text-center studio-guest-cta">
+            <p className="text-xs mb-3 studio-guest-text">Sign in to synthesize audio and track your usage.</p>
             <button type="button" onClick={onSignIn}
-              className="px-6 py-2.5 rounded-xl text-sm font-bold"
-              style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
+              className="px-6 py-2.5 rounded-xl text-sm font-bold studio-signin-btn">
               Sign In / Create Account
             </button>
           </div>
@@ -776,10 +1074,10 @@ function StudioBody({ user, onSignIn, onPlans }: {
 // ── Small helpers ─────────────────────────────────────────────────────────────
 function Section({ title, icon, children, className = '' }: { title: string; icon: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl p-5 space-y-3 ${className}`} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className={`rounded-2xl p-5 space-y-3 studio-section ${className}`}>
       <div className="flex items-center gap-2 mb-1">
         {icon}
-        <span className="text-sm font-bold display" style={{ color: '#f0faf7' }}>{title}</span>
+        <span className="text-sm font-bold display studio-section-title">{title}</span>
       </div>
       {children}
     </div>
@@ -787,18 +1085,17 @@ function Section({ title, icon, children, className = '' }: { title: string; ico
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-xs flex items-center gap-1 mt-1" style={{ color: 'rgba(240,250,247,0.5)' }}>{children}</div>
+  return <div className="text-xs flex items-center gap-1 mt-1 studio-field-label">{children}</div>
 }
 
 function SelectField({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { label: string; value: string }[] }) {
   return (
     <div className="relative">
       <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full appearance-none rounded-xl px-4 py-3 text-sm outline-none border pr-9 transition-colors"
-        style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(32,210,160,0.3)', color: '#f0faf7', fontFamily: 'inherit' }}>
+        className="w-full appearance-none rounded-xl px-4 py-3 text-sm outline-none pr-9 transition-colors studio-select">
         {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'rgba(240,250,247,0.4)' }} />
+      <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none studio-select-arrow" />
     </div>
   )
 }

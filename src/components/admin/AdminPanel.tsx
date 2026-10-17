@@ -57,7 +57,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
   const current = NAV.find(n => n.id === tab)!
 
   return (
-    <div className="min-h-dvh flex" style={{ background: T.bg, fontFamily: "'DM Sans', sans-serif" }}>
+    <div className="admin-root min-h-dvh flex" style={{ background: 'var(--page, ' + T.bg + ')', fontFamily: "'DM Sans', sans-serif" }}>
 
       {/* Sidebar */}
       <>
@@ -318,7 +318,7 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
           <CardTitle icon={<Globe size={14} />} title="Brand" />
           <Field label="Site Name"><AInput value={cfg.siteName} onChange={v => setCfg({ ...cfg, siteName: v })} /></Field>
           <Field label="Tagline"><AInput value={cfg.tagline} onChange={v => setCfg({ ...cfg, tagline: v })} /></Field>
-          <Field label="Logo file"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 700_000) { setError('Logo must be under 700 KB.'); return } const reader = new FileReader(); reader.onload = () => setCfg({ ...cfg, logoUrl: String(reader.result) }); reader.readAsDataURL(file) }} className="w-full text-xs" /></Field>
+          <Field label="Logo file"><input type="file" accept="image/*" onChange={e => { const file = e.target.files?.[0]; if (!file) return; if (file.size > 700_000) { setError('Logo must be under 700 KB.'); return } const reader = new FileReader(); reader.onload = () => setCfg({ ...cfg, logoUrl: (reader.result as string) ?? '' }); reader.readAsDataURL(file) }} className="w-full text-xs" /></Field>
           <Field label="Support Email"><AInput value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} /></Field>
           {cfg.logoUrl && (
             <div className="pt-2">
@@ -547,7 +547,7 @@ function VoiceSamplesTab() {
     if (!file.type.startsWith('audio/')) { setError('Choose an audio file.'); return }
     if (file.size > 1_000_000) { setError('Keep sample files under 1 MB.'); return }
     const reader = new FileReader()
-    reader.onload = () => { setAudioDataUrl(String(reader.result)); setFileName(file.name); setError('') }
+    reader.onload = () => { setAudioDataUrl((reader.result as string) ?? ''); setFileName(file.name); setError('') }
     reader.readAsDataURL(file)
   }
 
@@ -772,7 +772,7 @@ function SField({ field, placeholder, cfg, setCfg, show, toggleShow }: SFieldPro
     <div className="relative">
       <input
         type={show[field] ? 'text' : 'password'}
-        value={String(cfg[field] ?? '')}
+        value={(cfg[field] as string | number | boolean | null | undefined)?.toString() ?? ''}
         onChange={e => setCfg({ ...cfg, [field]: e.target.value })}
         placeholder={placeholder}
         className="w-full rounded-xl px-3 py-2.5 pr-10 text-sm outline-none border transition-all"
