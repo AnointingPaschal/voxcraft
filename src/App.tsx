@@ -80,7 +80,7 @@ function navigate(path: string) {
 }
 
 // ── Apply siteConfig palette to ALL CSS custom properties across the site ──────
-function applyPalette(palette: SiteConfig['lightPalette'] | undefined) {
+function applyPalette(palette: SiteConfig['lightPalette'] | undefined, primaryColor?: string, darkPalette?: SiteConfig['darkPalette'], theme?: 'light' | 'dark') {
   if (!palette) return
   const r = document.documentElement
   const bg   = palette.background
@@ -88,7 +88,7 @@ function applyPalette(palette: SiteConfig['lightPalette'] | undefined) {
   const txt  = palette.text
   const mut  = palette.muted
   const bdr  = palette.border
-  const acc  = palette.accent
+  const acc  = primaryColor || palette.accent  // brand colour overrides palette accent
 
   // Derive a semi-transparent surface for hover/card states
   const map: [string, string][] = [
@@ -145,6 +145,17 @@ function applyPalette(palette: SiteConfig['lightPalette'] | undefined) {
     ['--admin-accent', acc],
   ]
   map.forEach(([k, v]) => r.style.setProperty(k, v))
+  // Cache palette so main.tsx can restore it synchronously on next load
+  try {
+    if (darkPalette && theme) {
+      const stored = JSON.parse(localStorage.getItem('vc_palette') ?? '{}') as Record<string, unknown>
+      if (theme === 'light') stored.light = palette
+      else stored.dark = palette
+      if (darkPalette) stored.dark = darkPalette
+      if (primaryColor) stored.brand = primaryColor
+      localStorage.setItem('vc_palette', JSON.stringify(stored))
+    }
+  } catch { /* ignore */ }
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
@@ -180,7 +191,15 @@ export default function App(): JSX.Element {
       return
     }
     const palette = theme === 'dark' ? siteConfig.darkPalette : siteConfig.lightPalette
-    applyPalette(palette)
+    applyPalette(palette, siteConfig.primaryColor, siteConfig.darkPalette, theme)
+    // Always cache both palettes so next load restores correctly
+    try {
+      localStorage.setItem('vc_palette', JSON.stringify({
+        light: siteConfig.lightPalette,
+        dark: siteConfig.darkPalette,
+        brand: siteConfig.primaryColor ?? palette.accent,
+      }))
+    } catch { /* ignore */ }
   }, [siteConfig, theme])
 
   const setPage = (p: Page) => {
@@ -249,7 +268,7 @@ export default function App(): JSX.Element {
             The API functions are not responding. Check that your Pages deployment completed successfully and the Functions tab shows compiled functions.
           </p>
         </>)}
-        <button onClick={() => window.location.reload()} className="w-full py-3 rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg,#20d2a0,#17a882)', color: '#fff' }}>
+        <button onClick={() => window.location.reload()} className="w-full py-3 rounded-xl text-sm font-semibold" style={{ background: 'linear-gradient(135deg,var(--site-accent,#20d2a0),var(--site-accent,#17a882))', color: 'var(--site-bg,#fff)' }}>
           Retry
         </button>
       </div>
@@ -943,7 +962,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
           </div>
           <div className="h-1.5 rounded-full overflow-hidden studio-usage-track">
             <div className="h-full rounded-full transition-all"
-              style={{ width: `${limitPct}%`, background: limitPct > 85 ? '#ff6b8a' : 'linear-gradient(90deg, var(--accent, #20d2a0), var(--accent-hover, #0ea882))' }} />
+              style={{ width: `${limitPct}%`, background: limitPct > 85 ? '#ff6b8a' : 'linear-gradient(90deg, var(--site-accent, #20d2a0), var(--site-accent, #0ea882))' }} />
           </div>
         </div>
       )}
