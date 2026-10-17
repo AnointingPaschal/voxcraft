@@ -294,7 +294,7 @@ export default function PlansPage({ onBack, allowThemeToggle = true, siteConfig,
                   </div>
                   <div>
                     <div className="text-sm font-bold plans-card-name">{plan.name}</div>
-                    <div className="text-xs tabular-nums plans-accent">{plan.tokensPerDay.toLocaleString()} chars/day</div>
+                    <div className="text-xs tabular-nums plans-accent">{plan.tokensPerDay.toLocaleString()} chars/{plan.tokenBillingMode === 'month' ? 'month' : 'day'}</div>
                   </div>
                 </div>
                 <div className="text-right">

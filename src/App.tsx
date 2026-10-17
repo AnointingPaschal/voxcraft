@@ -769,7 +769,6 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       setSc(loaded)
       setAccent(loaded.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
       setPerfStyle(loaded.perfStyles[0] ?? '')
-      setPacing(loaded.speedDefault)
     }).catch(() => setSc(DEFAULT_STUDIO_CONFIG))
   }, [])
 
@@ -785,7 +784,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [timbre, setTimbre] = useState<Timbre>('Male')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
-  const [pacing, setPacing] = useState(sc.speedDefault)
+  const [pacing] = useState(1.0)
   const [format, setFormat] = useState('mp3')
   const [text, setText] = useState('')
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
@@ -924,7 +923,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       if (msg.includes('limit') || msg.includes('quota')) onPlans()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, text, scriptMode, format, accent, timbre, perfStyle, pacing, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
+  }, [user, text, scriptMode, format, accent, timbre, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
   const handleDownload = useCallback(() => {
     if (!audioBlob) return
@@ -975,12 +974,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
 
         <div className="flex items-end gap-4">
-          <div className="flex-1">
-            <FieldLabel>Pacing <span className="tabular-nums pacing-val">{pacing.toFixed(2)}x</span></FieldLabel>
-            <input type="range" min={sc.speedMin} max={sc.speedMax} step={0.05} value={pacing} onChange={e => setPacing(Number(e.target.value))}
-              className="w-full h-1 rounded-full studio-range" />
-          </div>
-          <div className="w-40">
+          <div className="w-48">
             <FieldLabel>Master Format</FieldLabel>
             <SelectField value={format} onChange={setFormat} options={FORMAT_OPTIONS} />
           </div>

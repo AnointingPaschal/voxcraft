@@ -1160,3 +1160,12 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
   border-radius: 4px;
   cursor: pointer;
 }
+
+/* Ghost button for inline toggle groups */
+.adm-btn-ghost {
+  background: transparent;
+  color: var(--ink, var(--site-muted));
+}
+.adm-btn-ghost:hover {
+  background: var(--site-border, rgba(0,0,0,.06));
+}

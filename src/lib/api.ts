@@ -149,6 +149,7 @@ export interface Plan {
   price: number
   priceNgn?: number
   tokensPerDay: number
+  tokenBillingMode?: 'day' | 'month'   // default 'day' when absent
   features: string[]
   popular?: boolean
 }

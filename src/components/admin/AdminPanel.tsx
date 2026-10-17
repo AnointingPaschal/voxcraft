@@ -494,7 +494,7 @@ function PlansTab() {
                   {plan.popular && <span className="adm-popular-pill text-xs px-2 py-0.5 rounded-full font-medium">Popular</span>}
                 </div>
                 <div className="flex items-center gap-3 mt-0.5">
-                  <span className="text-xs tabular-nums adm-accent">{plan.tokensPerDay.toLocaleString()} chars/day</span>
+                  <span className="text-xs tabular-nums adm-accent">{plan.tokensPerDay.toLocaleString()} chars/{plan.tokenBillingMode === 'month' ? 'month' : 'day'}</span>
                   <span className="text-xs adm-dim">{plan.price === 0 ? 'Free' : `$${plan.price}/mo`}</span>
                 </div>
               </div>
@@ -512,7 +512,23 @@ function PlansTab() {
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Plan Name"><AInput value={plan.name} onChange={v => update(plan.id, { name: v })} /></Field>
                       <Field label="Price (USD/month)"><AInput value={String(plan.price)} type="number" onChange={v => update(plan.id, { price: Number(v) })} /></Field>
-                      <Field label="Tokens / Day"><AInput value={String(plan.tokensPerDay)} type="number" onChange={v => update(plan.id, { tokensPerDay: Number(v) })} /></Field>
+                      <Field label={`Tokens / ${plan.tokenBillingMode === 'month' ? 'Month' : 'Day'}`}>
+                        <div className="flex gap-2">
+                          <AInput value={String(plan.tokensPerDay)} type="number" onChange={v => update(plan.id, { tokensPerDay: Number(v) })} />
+                          <div className="flex rounded-xl overflow-hidden border adm-border mt-1 text-xs font-semibold shrink-0">
+                            <button type="button"
+                              onClick={() => update(plan.id, { tokenBillingMode: 'day' })}
+                              className={`px-3 py-2 transition-colors ${(plan.tokenBillingMode ?? 'day') === 'day' ? 'adm-save-btn' : 'adm-btn-ghost'}`}>
+                              /day
+                            </button>
+                            <button type="button"
+                              onClick={() => update(plan.id, { tokenBillingMode: 'month' })}
+                              className={`px-3 py-2 transition-colors ${plan.tokenBillingMode === 'month' ? 'adm-save-btn' : 'adm-btn-ghost'}`}>
+                              /month
+                            </button>
+                          </div>
+                        </div>
+                      </Field>
                       <Field label="Popular Badge">
                         <button type="button" onClick={() => update(plan.id, { popular: !plan.popular })}
                           className={`flex items-center gap-2 text-xs py-2.5 px-3 rounded-xl w-full mt-1 adm-toggle-btn${plan.popular ? ' active' : ''}`}>
@@ -594,7 +610,7 @@ function VoiceSamplesTab() {
   const [script, setScript] = useState('Hello, and thank you for listening. I am recording this audio snippet to help train a natural-sounding AI voice clone. It is important to speak clearly, maintain a steady rhythm, and avoid rushing through the sentences.')
   const [genGender, setGenGender] = useState<'Male' | 'Female' | 'Auto / Match'>('Female')
   const [genStyle, setGenStyle] = useState('Natural & Conversational')
-  const [genSpeed, setGenSpeed] = useState(1.0)
+  const [genSpeed] = useState(1.0)
 
   // Step 3 — preview
   const [genStatus, setGenStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
@@ -727,9 +743,6 @@ function VoiceSamplesTab() {
         <div className="adm-step-label">③ Generation settings</div>
         <div className="grid sm:grid-cols-2 gap-3">
           <Field label="Performance Style"><AInput value={genStyle} onChange={setGenStyle} placeholder="Natural & Conversational" /></Field>
-          <Field label={`Speech Speed: ${genSpeed.toFixed(2)}x`}>
-            <input type="range" min={0.5} max={2.0} step={0.05} value={genSpeed} onChange={e => setGenSpeed(Number(e.target.value))} className="w-full adm-range mt-2" />
-          </Field>
         </div>
 
         <Field label="Script — the voice will speak this text">
@@ -916,14 +929,11 @@ function StudioControlsTab() {
           className="flex items-center gap-1.5 text-xs adm-accent adm-add-btn px-3 py-2 rounded-lg"><Plus size={12} /> Add Template</button>
       </div>
 
-      {/* Speed & Limits */}
+      {/* Character Limits */}
       <div className="adm-card rounded-2xl p-5 space-y-3">
-        <CardTitle icon={<Sliders size={14} />} title="Speed & Character Limits" />
+        <CardTitle icon={<Sliders size={14} />} title="Character Limits" />
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Min Speed"><AInput value={String(cfg.speedMin)} type="number" onChange={v => setCfg({ ...cfg, speedMin: Number(v) })} /></Field>
-          <Field label="Max Speed"><AInput value={String(cfg.speedMax)} type="number" onChange={v => setCfg({ ...cfg, speedMax: Number(v) })} /></Field>
-          <Field label="Default Speed"><AInput value={String(cfg.speedDefault)} type="number" onChange={v => setCfg({ ...cfg, speedDefault: Number(v) })} /></Field>
-          <Field label="Max Characters"><AInput value={String(cfg.maxChars)} type="number" onChange={v => setCfg({ ...cfg, maxChars: Number(v) })} /></Field>
+          <Field label="Max Characters per generation"><AInput value={String(cfg.maxChars)} type="number" onChange={v => setCfg({ ...cfg, maxChars: Number(v) })} /></Field>
         </div>
       </div>
 
