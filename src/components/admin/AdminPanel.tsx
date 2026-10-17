@@ -5,6 +5,7 @@ import {
   CreditCard, Users, Save, Loader2, CheckCircle2, Eye, EyeOff,
   ChevronDown, ChevronUp, ArrowLeft, AudioWaveform, Menu,
   TrendingUp, UserCheck, Zap, AlertTriangle, Palette, Settings, Trash2, Upload,
+  Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle,
   type LucideIcon,
 } from 'lucide-react'
 import ThemeToggle from '../ThemeToggle'
@@ -309,6 +310,9 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
             }} className="w-full text-xs adm-muted" />
           </Field>
           <Field label="Support Email"><AInput value={cfg.supportEmail} type="email" onChange={v => setCfg({ ...cfg, supportEmail: v })} /></Field>
+          <Field label="Phone number"><AInput value={cfg.contactPhone ?? ''} placeholder="+1 234 567 8900" onChange={v => setCfg({ ...cfg, contactPhone: v })} /></Field>
+          <Field label="Address"><AInput value={cfg.contactAddress ?? ''} placeholder="123 Studio Street" onChange={v => setCfg({ ...cfg, contactAddress: v })} /></Field>
+          <Field label="City / Region"><AInput value={cfg.contactCity ?? ''} placeholder="Lagos, Nigeria" onChange={v => setCfg({ ...cfg, contactCity: v })} /></Field>
           {cfg.logoUrl && (
             <div className="pt-2">
               <img src={cfg.logoUrl} alt="logo preview" className="h-10 rounded-xl object-contain adm-logo-preview" />
@@ -316,6 +320,16 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
           )}
         </Card>
 
+        <Card>
+          <CardTitle icon={<MessageCircle size={14} />} title="Social &amp; Contact Links" />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Twitter / X handle"><div className="flex gap-2 items-center"><Twitter size={13} className="adm-muted flex-shrink-0" /><AInput value={cfg.contactTwitter ?? ''} placeholder="@yourbrand" onChange={v => setCfg({ ...cfg, contactTwitter: v })} /></div></Field>
+            <Field label="Instagram handle"><div className="flex gap-2 items-center"><Instagram size={13} className="adm-muted flex-shrink-0" /><AInput value={cfg.contactInstagram ?? ''} placeholder="@yourbrand" onChange={v => setCfg({ ...cfg, contactInstagram: v })} /></div></Field>
+            <Field label="LinkedIn company"><div className="flex gap-2 items-center"><Linkedin size={13} className="adm-muted flex-shrink-0" /><AInput value={cfg.contactLinkedin ?? ''} placeholder="yourbrand" onChange={v => setCfg({ ...cfg, contactLinkedin: v })} /></div></Field>
+            <Field label="WhatsApp number"><div className="flex gap-2 items-center"><Phone size={13} className="adm-muted flex-shrink-0" /><AInput value={cfg.contactWhatsapp ?? ''} placeholder="+2348000000000" onChange={v => setCfg({ ...cfg, contactWhatsapp: v })} /></div></Field>
+          </div>
+          <p className="text-xs adm-dim mt-1" style={{ display: 'flex', alignItems: 'center', gap: 4 }}><MapPin size={11} /> These appear on your Contact page.</p>
+        </Card>
         <Card>
           <CardTitle icon={<Palette size={14} />} title="Appearance" />
 

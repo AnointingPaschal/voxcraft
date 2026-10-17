@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Loader2, Zap, Star, Crown, Building2, ChevronDown, RefreshCw } from 'lucide-react'
-import { getPlans, initPayment, type Plan } from '../../lib/api'
+import { CheckCircle2, Loader2, Zap, Star, Crown, Building2, ChevronDown, RefreshCw, AudioWaveform, Menu, X } from 'lucide-react'
+import { getPlans, initPayment, type Plan, type SiteConfig } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
 import ThemeToggle from '../ThemeToggle'
 
@@ -62,9 +62,19 @@ async function getUsdRate(toCurrency: CurrencyCode): Promise<number> {
   }
 }
 
-interface Props { onBack: () => void; allowThemeToggle?: boolean }
+type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin' | 'contact'
 
-export default function PlansPage({ onBack, allowThemeToggle = true }: Props) {
+interface Props {
+  onBack: () => void
+  allowThemeToggle?: boolean
+  siteConfig?: SiteConfig | null
+  onNavigate?: (p: Page) => void
+  user?: { name: string } | null
+  onSignIn?: () => void
+  onStudio?: () => void
+}
+
+export default function PlansPage({ onBack, allowThemeToggle = true, siteConfig, onNavigate, user: userProp, onSignIn, onStudio }: Props) {
   const { user } = useAuth()
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
@@ -137,6 +147,7 @@ export default function PlansPage({ onBack, allowThemeToggle = true }: Props) {
     } finally { setUpgrading(null) }
   }
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const selectedCur = CURRENCIES.find(c => c.code === currency)!
 
   if (loading) return (
@@ -146,8 +157,55 @@ export default function PlansPage({ onBack, allowThemeToggle = true }: Props) {
   )
 
   return (
-    <div className="plans-page max-w-2xl mx-auto px-4 py-8">
-      <div className="flex justify-end mb-3"><ThemeToggle enabled={allowThemeToggle} /></div>
+    <div className="plans-page-wrapper min-h-dvh">
+      {/* ── Nav header ── */}
+      <nav className="landing-nav mobile-menu-root" style={{ position: 'relative' }}>
+        <a href="/" className="brand-lockup" aria-label="Home">
+          {siteConfig?.logoUrl
+            ? <img style={{ width: 32, height: 32, objectFit: 'contain', borderRadius: 8 }} src={siteConfig.logoUrl} alt="" />
+            : <span className="brand-mark"><AudioWaveform size={18} /></span>}
+          <span>{siteConfig?.siteName || 'voxcraft'}</span>
+          <span className="brand-dot">STUDIO</span>
+        </a>
+        <div className="landing-links">
+          <a href="/">Studio</a>
+          <a href="/contact" onClick={e => { e.preventDefault(); onNavigate?.('contact') }}>Contact</a>
+          <a href="/plans" aria-current="page">Pricing</a>
+        </div>
+        <div className="landing-actions">
+          <ThemeToggle enabled={allowThemeToggle} />
+          {userProp
+            ? <button className="button button-primary" onClick={onStudio}>Open studio ↗</button>
+            : <>
+                <button className="button button-quiet" onClick={onSignIn}>Sign in</button>
+                <button className="button button-primary" onClick={onStudio}>Get Started ↗</button>
+              </>
+          }
+        </div>
+        <div className="mobile-nav-actions">
+          <ThemeToggle enabled={allowThemeToggle} />
+          <button type="button" className="hamburger-btn" onClick={() => setMobileMenuOpen(v => !v)}>
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div className="mobile-menu" initial={{ opacity:0,y:-12,scale:.97 }} animate={{ opacity:1,y:0,scale:1 }} exit={{ opacity:0,y:-12,scale:.97 }} transition={{ duration:.2 }}>
+              <a href="/" onClick={() => setMobileMenuOpen(false)}>Studio</a>
+              <a href="/contact" onClick={e => { e.preventDefault(); setMobileMenuOpen(false); onNavigate?.('contact') }}>Contact</a>
+              <a href="/plans" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+              <div className="mobile-menu-divider" />
+              {userProp
+                ? <button className="button button-primary mobile-menu-cta" onClick={() => { setMobileMenuOpen(false); onStudio?.() }}>Open studio ↗</button>
+                : <button className="button button-primary mobile-menu-cta" onClick={() => { setMobileMenuOpen(false); onSignIn?.() }}>Get Started ↗</button>
+              }
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </nav>
+
+      <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="flex justify-end mb-3" style={{ display: 'none' }}><ThemeToggle enabled={allowThemeToggle} /></div>
 
       <div className="text-center mb-8">
         <h1 className="display text-2xl font-bold mb-2 plans-heading">Choose Your Plan</h1>
@@ -290,6 +348,7 @@ export default function PlansPage({ onBack, allowThemeToggle = true }: Props) {
       <p className="text-center text-xs mt-4 plans-fine-print">
         Payments processed securely via Flutterwave. Cancel anytime.
       </p>
+      </div>
     </div>
   )
 }

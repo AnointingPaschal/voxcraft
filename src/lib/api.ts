@@ -64,6 +64,14 @@ export interface SiteConfig {
   allowThemeToggle: boolean
   supportEmail: string
   maintenanceMode: boolean
+  // Contact page details
+  contactPhone?: string
+  contactAddress?: string
+  contactCity?: string
+  contactTwitter?: string
+  contactInstagram?: string
+  contactLinkedin?: string
+  contactWhatsapp?: string
 }
 
 export interface VoiceSample { id: string; name: string; accent: string; description: string; audioDataUrl: string; updatedAt: number }

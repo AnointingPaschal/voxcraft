@@ -1,9 +1,11 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, type JSX } from 'react'
+import type React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mic, Upload, FileText, Wand2, Play, Download, Loader2, MessageSquareText,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
   Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu,
+  Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
@@ -62,13 +64,12 @@ const SYNTHESIS_STAGES = [
   { label: 'Mastering', desc: 'Mastering audio for studio quality…' },
 ]
 
-type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin' | 'about' | 'contact'
+type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin' | 'contact'
 
 function pathToPage(pathname: string): Page | null {
   if (pathname === '/studio') return 'studio'
   if (pathname === '/auth' || pathname === '/auth/callback') return 'auth'
   if (pathname === '/plans' || pathname === '/pricing') return 'plans'
-  if (pathname === '/about') return 'about'
   if (pathname === '/contact') return 'contact'
   if (pathname === '/admin') return 'admin'
   return null
@@ -268,7 +269,7 @@ export default function App(): JSX.Element {
   if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} />
   if (page === 'plans') return (
     <PageShell>
-      <PlansPage onBack={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} />
+      <PlansPage onBack={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} siteConfig={siteConfig} onNavigate={setPage} user={user} onSignIn={() => setPage('auth')} onStudio={() => setPage('studio')} />
     </PageShell>
   )
   if (page === 'studio') return (
@@ -338,9 +339,8 @@ function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, 
         <div className="landing-links">
           <a href="#studio">Studio</a>
           <a href="#voice-samples">Voices</a>
-          <a href="/about" onClick={e => { e.preventDefault(); onNavigate('about') }}>About</a>
           <a href="/contact" onClick={e => { e.preventDefault(); onNavigate('contact') }}>Contact</a>
-          <a href="/plans">Pricing</a>
+          <a href="/plans" onClick={e => { e.preventDefault(); onNavigate('plans') }}>Pricing</a>
         </div>
 
         {/* Desktop actions */}
@@ -380,9 +380,8 @@ function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, 
             >
               <a href="#studio" onClick={() => setMobileMenuOpen(false)}>Studio</a>
               <a href="#voice-samples" onClick={() => setMobileMenuOpen(false)}>Voices</a>
-              <a href="/about" onClick={e => { e.preventDefault(); setMobileMenuOpen(false); onNavigate('about') }}>About</a>
               <a href="/contact" onClick={e => { e.preventDefault(); setMobileMenuOpen(false); onNavigate('contact') }}>Contact</a>
-              <a href="/plans" onClick={() => setMobileMenuOpen(false)}>Pricing</a>
+              <a href="/plans" onClick={e => { e.preventDefault(); setMobileMenuOpen(false); onNavigate('plans') }}>Pricing</a>
               <div className="mobile-menu-divider" />
               {user
                 ? <button className="button button-primary mobile-menu-cta" onClick={() => { setMobileMenuOpen(false); onStudio() }}>Open studio <ArrowRightIcon /></button>
@@ -397,20 +396,8 @@ function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, 
       </nav>
 
       <main>
-        {(page === 'about' || page === 'contact') ? (
-          <section className="info-page">
-            <div className="eyebrow">VOXCRAFT STUDIO</div>
-            <h1>{page === 'about' ? 'A voice with room for every story.' : "Let\u2019s make something worth hearing."}</h1>
-            <p>{page === 'about'
-              ? 'VoxCraft helps creators shape spoken ideas with expressive voices, regional character, and a simple production workflow.'
-              : "Questions about your workspace, plans, or voice library? Reach our team and we\u2019ll help you find the right next step."
-            }</p>
-            {page === 'contact' && (
-              <a className="button button-primary" href={`mailto:${siteConfig?.supportEmail || 'support@voxcraft.ai'}`}>
-                Email {siteConfig?.supportEmail || 'support@voxcraft.ai'} <ArrowRightIcon />
-              </a>
-            )}
-          </section>
+        {page === 'contact' ? (
+          <ContactPage siteConfig={siteConfig} onNavigate={onNavigate} />
         ) : <>
           {/* ── Hero ── */}
           <section className="hero-section" id="studio">
@@ -600,7 +587,6 @@ function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, 
         </a>
         <span>Voice, with a point of view.</span>
         <div className="footer-links">
-          <button onClick={() => onNavigate('about')}>About</button>
           <button onClick={() => onNavigate('contact')}>Contact</button>
           <button onClick={() => onNavigate('plans')}>Pricing</button>
           <button onClick={onSignIn}>Your workspace <ArrowRightIcon /></button>
@@ -611,6 +597,99 @@ function HomePage({ onEnter, onSignIn, user, onStudio, allowThemeToggle = true, 
 }
 
 function ArrowRightIcon() { return <span aria-hidden="true">↗</span> }
+
+// ── Contact Page ──────────────────────────────────────────────────────────────
+function ContactPage({ siteConfig, onNavigate }: { siteConfig: SiteConfig | null; onNavigate: (p: Page) => void }) {
+  const email = siteConfig?.supportEmail || 'support@voxcraft.ai'
+  const phone = siteConfig?.contactPhone
+  const address = siteConfig?.contactAddress
+  const city = siteConfig?.contactCity
+  const twitter = siteConfig?.contactTwitter
+  const instagram = siteConfig?.contactInstagram
+  const linkedin = siteConfig?.contactLinkedin
+  const whatsapp = siteConfig?.contactWhatsapp
+
+  const socialLinks = [
+    twitter && { icon: Twitter, label: 'Twitter / X', href: twitter.startsWith('http') ? twitter : `https://twitter.com/${twitter}` },
+    instagram && { icon: Instagram, label: 'Instagram', href: instagram.startsWith('http') ? instagram : `https://instagram.com/${instagram}` },
+    linkedin && { icon: Linkedin, label: 'LinkedIn', href: linkedin.startsWith('http') ? linkedin : `https://linkedin.com/company/${linkedin}` },
+    whatsapp && { icon: MessageCircle, label: 'WhatsApp', href: `https://wa.me/${whatsapp.replace(/\D/g, '')}` },
+  ].filter(Boolean) as { icon: React.ComponentType<{ size?: number }>; label: string; href: string }[]
+
+  return (
+    <section className="contact-page">
+      <div className="contact-hero">
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, ease: [0.22,1,0.36,1] }}>
+          <div className="eyebrow"><span className="live-dot" /> GET IN TOUCH</div>
+          <h1>{"Let's make something"}<br /><em>worth hearing.</em></h1>
+          <p className="hero-lede">Questions about plans, your workspace, or the voice library? We would love to hear from you.</p>
+        </motion.div>
+      </div>
+
+      <div className="contact-grid">
+        {/* Contact cards */}
+        <motion.div className="contact-cards" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15, duration: 0.55 }}>
+          {email && (
+            <a href={`mailto:${email}`} className="contact-card">
+              <span className="contact-card-icon"><Mail size={20} /></span>
+              <div>
+                <div className="contact-card-label">Email us</div>
+                <div className="contact-card-value">{email}</div>
+              </div>
+            </a>
+          )}
+          {phone && (
+            <a href={`tel:${phone}`} className="contact-card">
+              <span className="contact-card-icon"><Phone size={20} /></span>
+              <div>
+                <div className="contact-card-label">Phone</div>
+                <div className="contact-card-value">{phone}</div>
+              </div>
+            </a>
+          )}
+          {(address || city) && (
+            <div className="contact-card">
+              <span className="contact-card-icon"><MapPin size={20} /></span>
+              <div>
+                <div className="contact-card-label">Location</div>
+                <div className="contact-card-value">{[address, city].filter(Boolean).join(', ')}</div>
+              </div>
+            </div>
+          )}
+          {socialLinks.length > 0 && (
+            <div className="contact-social">
+              <div className="contact-card-label" style={{ marginBottom: 10 }}>Follow us</div>
+              <div className="contact-social-links">
+                {socialLinks.map(s => (
+                  <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer" className="contact-social-btn" aria-label={s.label}>
+                    <s.icon size={18} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Quick links */}
+        <motion.div className="contact-quick" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.25, duration: 0.55 }}>
+          <div className="contact-quick-title">Quick links</div>
+          <a href={`mailto:${email}`} className="contact-quick-link">
+            <span>Send an email</span><ArrowRightIcon />
+          </a>
+          <button className="contact-quick-link" onClick={() => onNavigate('plans')}>
+            <span>View pricing plans</span><ArrowRightIcon />
+          </button>
+          <button className="contact-quick-link" onClick={() => onNavigate('studio')}>
+            <span>Open the studio</span><ArrowRightIcon />
+          </button>
+          <div className="contact-quick-note">
+            Response time is typically within one business day.
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  )
+}
 
 // ── Studio Header ─────────────────────────────────────────────────────────────
 function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = true }: {
