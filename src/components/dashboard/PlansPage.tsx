@@ -140,7 +140,7 @@ export default function PlansPage({ onBack, allowThemeToggle = true, siteConfig,
     if (!user || plan.id === user.plan || plan.price === 0) return
     setUpgrading(plan.id); setError('')
     try {
-      const { link } = await initPayment(plan.id, currency === 'NGN' ? 'NGN' : 'USD')
+      const { link } = await initPayment(plan.id, currency)
       window.open(link, '_self')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment initialization failed.')

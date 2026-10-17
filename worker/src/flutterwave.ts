@@ -1,16 +1,30 @@
 import type { Env, Plan, User, PaymentRecord } from './types'
 import { getUser, putUser, putPayment, getPayment, getSiteConfig } from './kv'
 
+async function getUsdRate(currency: string): Promise<number> {
+  if (currency === 'USD') return 1
+  try {
+    const res = await fetch(`https://open.er-api.com/v6/latest/USD`)
+    if (!res.ok) return 1
+    const data = await res.json() as { rates?: Record<string, number> }
+    return data.rates?.[currency] ?? 1
+  } catch { return 1 }
+}
+
 export async function initializePayment(
-  env: Env, user: User, plan: Plan, redirectUrl: string,
+  env: Env, user: User, plan: Plan, redirectUrl: string, currency = 'USD',
 ): Promise<{ link: string; txRef: string } | { error: string }> {
   const cfg = await getSiteConfig(env)
   if (!cfg.flutterwaveSecretKey) return { error: 'Payment not configured. Contact admin.' }
+  if (plan.price <= 0) return { error: 'Free plan requires no payment.' }
+
+  const fxRate = await getUsdRate(currency.toUpperCase())
+  const convertedAmount = Math.ceil(plan.price * fxRate * 100) / 100
 
   const txRef = `voxcraft-${user.id}-${Date.now()}`
   const rec: PaymentRecord = {
     id: crypto.randomUUID(), userId: user.id, plan: plan.id,
-    amount: plan.price, currency: 'USD', status: 'pending',
+    amount: convertedAmount, currency: currency.toUpperCase(), status: 'pending',
     txRef, createdAt: Date.now(),
   }
   await putPayment(env, rec)
@@ -19,15 +33,17 @@ export async function initializePayment(
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.flutterwaveSecretKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      tx_ref: txRef, amount: plan.price, currency: 'USD',
+      tx_ref: txRef,
+      amount: convertedAmount,
+      currency: currency.toUpperCase(),
       redirect_url: redirectUrl,
       customer: { email: user.email, name: user.name },
       customizations: {
-        title: cfg.siteName,
-        description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/day`,
+        title: cfg.siteName || 'VoxCraft Studio',
+        description: `${plan.name} Plan — ${plan.tokensPerDay.toLocaleString()} chars/${(plan as { tokenBillingMode?: string }).tokenBillingMode === 'month' ? 'month' : 'day'}`,
         logo: cfg.logoUrl || undefined,
       },
-      payment_options: 'card,ussd,bank_transfer',
+      payment_options: 'card,ussd,bank_transfer,mobilemoney',
       meta: { txRef, userId: user.id, plan: plan.id },
     }),
   })

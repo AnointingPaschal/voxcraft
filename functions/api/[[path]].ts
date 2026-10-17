@@ -178,13 +178,15 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
   if (path === '/api/payment/init' && req.method === 'POST') {
     const user = await requireAuth(env, req)
     if (!user) return e('Unauthorized', 401)
-    const { planId, currency = 'USD' } = await req.json() as { planId: string; currency?: 'USD' | 'NGN' }
+    const { planId, currency = 'USD' } = await req.json() as { planId: string; currency?: string }
     const plans = await getPlans(env)
     const plan = plans.find(p => p.id === planId)
     if (!plan) return e('Invalid plan.')
-    if (currency !== 'USD' && currency !== 'NGN') return e('Unsupported currency.')
-    if ((currency === 'USD' ? plan.price : plan.priceNgn) === 0) return e('Free plan requires no payment.')
-    const result = await initializePayment(env, user, plan, 'https://voicera.pages.dev/billing/callback', currency)
+    if (plan.price <= 0) return e('Free plan requires no payment.')
+    // Derive redirect URL from the request origin so it works on any deployment
+    const origin = new URL(req.url).origin
+    const redirectUrl = `${origin}/billing/callback`
+    const result = await initializePayment(env, user, plan, redirectUrl, currency.toUpperCase())
     if ('error' in result) return e(result.error)
     return json(result)
   }

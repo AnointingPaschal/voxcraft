@@ -192,7 +192,7 @@ export async function synthesize(body: Record<string, unknown>): Promise<{ blob:
 }
 
 // ── Payment ───────────────────────────────────────────────────────────────────
-export async function initPayment(planId: string, currency: 'USD' | 'NGN' = 'USD'): Promise<{ link: string; txRef: string }> {
+export async function initPayment(planId: string, currency = 'USD'): Promise<{ link: string; txRef: string }> {
   return handle(await fetch(`${BASE}/payment/init`, { method: 'POST', headers: headers(), body: JSON.stringify({ planId, currency }) }))
 }
 

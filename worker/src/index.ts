@@ -188,13 +188,14 @@ export default {
     if (path === '/api/payment/init' && req.method === 'POST') {
       const user = await requireAuth(env, req)
       if (!user) return e('Unauthorized', 401)
-      const { planId } = await req.json() as { planId: string }
+      const { planId, currency = 'USD' } = await req.json() as { planId: string; currency?: string }
       const plans = await getPlans(env)
       const plan = plans.find(p => p.id === planId)
       if (!plan) return e('Invalid plan.')
-      if (plan.price === 0) return e('Free plan requires no payment.')
-      const redirectUrl = 'https://voicera.pages.dev/billing/callback'
-      const result = await initializePayment(env, user, plan, redirectUrl)
+      if (plan.price <= 0) return e('Free plan requires no payment.')
+      const origin = new URL(req.url).origin
+      const redirectUrl = `${origin}/billing/callback`
+      const result = await initializePayment(env, user, plan, redirectUrl, currency.toUpperCase())
       if ('error' in result) return e(result.error)
       return json(result, 200, ch)
     }
