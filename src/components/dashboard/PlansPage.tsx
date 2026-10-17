@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle2, Loader2, Zap, Star, Crown, Building2 } from 'lucide-react'
 import { getPlans, initPayment, type Plan } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
+import ThemeToggle from '../ThemeToggle'
 
 const ICONS = { free: Zap, starter: Star, pro: Crown, enterprise: Building2 }
 
@@ -14,10 +15,13 @@ export default function PlansPage({ onBack }: Props) {
   const [loading, setLoading] = useState(true)
   const [upgrading, setUpgrading] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [currency, setCurrency] = useState<'USD' | 'NGN'>(() => (localStorage.getItem('vc_currency') as 'USD' | 'NGN') || 'USD')
 
   useEffect(() => {
     getPlans().then(setPlans).catch(console.error).finally(() => setLoading(false))
   }, [])
+
+  function changeCurrency(value: 'USD' | 'NGN') { setCurrency(value); localStorage.setItem('vc_currency', value) }
 
   async function handleUpgrade(plan: Plan) {
     if (!user) return
@@ -26,7 +30,7 @@ export default function PlansPage({ onBack }: Props) {
     setUpgrading(plan.id)
     setError('')
     try {
-      const { link } = await initPayment(plan.id)
+      const { link } = await initPayment(plan.id, currency)
       window.open(link, '_self')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment initialization failed.')
@@ -43,10 +47,13 @@ export default function PlansPage({ onBack }: Props) {
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      <div className="flex justify-end mb-3"><ThemeToggle /></div>
       <div className="text-center mb-8">
         <h1 className="display text-2xl font-bold mb-2" style={{ color: '#f0faf7' }}>Choose Your Plan</h1>
         <p className="text-sm" style={{ color: 'rgba(240,250,247,0.5)' }}>Upgrade for more characters, voices, and studio features.</p>
       </div>
+
+      <div className="currency-picker"><label htmlFor="checkout-currency">Checkout currency</label><select id="checkout-currency" value={currency} onChange={e => changeCurrency(e.target.value as 'USD' | 'NGN')}><option value="USD">USD · US Dollar</option><option value="NGN">NGN · Nigerian Naira</option></select><span>Plan prices are set by the site admin for each currency.</span></div>
 
       {error && (
         <div className="rounded-xl px-4 py-3 mb-6 text-sm text-center" style={{ background: 'rgba(186,43,76,0.12)', border: '1px solid rgba(186,43,76,0.3)', color: '#ff6b8a' }}>{error}</div>
@@ -57,6 +64,8 @@ export default function PlansPage({ onBack }: Props) {
           const Icon = ICONS[plan.id] ?? Zap
           const isCurrent = user?.plan === plan.id
           const isPopular = plan.popular
+          const selectedPrice = currency === 'USD' ? plan.price : plan.priceNgn
+          const priceLabel = selectedPrice == null ? 'Not configured' : selectedPrice === 0 ? 'Free' : new Intl.NumberFormat(currency === 'NGN' ? 'en-NG' : 'en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(selectedPrice)
           return (
             <motion.div
               key={plan.id}
@@ -90,9 +99,9 @@ export default function PlansPage({ onBack }: Props) {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold tabular-nums" style={{ color: '#f0faf7' }}>
-                    {plan.price === 0 ? 'Free' : `$${plan.price}`}
+                    {priceLabel}
                   </div>
-                  {plan.price > 0 && <div className="text-xs" style={{ color: 'rgba(240,250,247,0.4)' }}>/month</div>}
+                  {selectedPrice != null && selectedPrice > 0 && <div className="text-xs" style={{ color: 'rgba(240,250,247,0.4)' }}>/month</div>}
                 </div>
               </div>
 
@@ -110,20 +119,20 @@ export default function PlansPage({ onBack }: Props) {
                   style={{ background: 'rgba(32,210,160,0.12)', border: '1px solid rgba(32,210,160,0.3)', color: '#20d2a0' }}>
                   Current Plan
                 </div>
-              ) : plan.price === 0 ? (
+              ) : selectedPrice === 0 ? (
                 <div className="w-full rounded-xl py-2.5 text-xs font-medium text-center"
                   style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'rgba(240,250,247,0.4)' }}>
                   Free tier
                 </div>
               ) : (
                 <button type="button" onClick={() => { void handleUpgrade(plan) }}
-                  disabled={upgrading === plan.id}
+                  disabled={upgrading === plan.id || selectedPrice == null}
                   className="w-full rounded-xl py-2.5 text-xs font-bold flex items-center justify-center gap-2 transition-all"
-                  style={upgrading === plan.id
+                  style={upgrading === plan.id || selectedPrice == null
                     ? { background: 'rgba(32,210,160,0.1)', color: 'rgba(32,210,160,0.5)', cursor: 'not-allowed' }
                     : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
                   {upgrading === plan.id ? <Loader2 size={13} className="animate-spin" /> : null}
-                  Upgrade to {plan.name}
+                  {selectedPrice == null ? `Set ${currency} price in admin` : `Upgrade to ${plan.name}`}
                 </button>
               )}
             </motion.div>

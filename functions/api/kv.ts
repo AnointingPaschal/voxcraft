@@ -1,4 +1,4 @@
-import type { Env, User, SiteConfig, Plan, UsageRecord, PaymentRecord } from './types'
+import type { Env, User, SiteConfig, Plan, UsageRecord, PaymentRecord, VoiceSample } from './types'
 
 // ── Key helpers ──────────────────────────────────────────────────────────────
 export const keys = {
@@ -6,6 +6,7 @@ export const keys = {
   userByEmail: (email: string) => `email:${email.toLowerCase()}`,
   siteConfig: () => 'config:site',
   plans: () => 'config:plans',
+  voices: () => 'config:voices',
   usage: (userId: string, date: string) => `usage:${userId}:${date}`,
   payment: (txRef: string) => `payment:${txRef}`,
   userList: () => 'list:users',
@@ -91,7 +92,7 @@ export async function listUsers(env: Env): Promise<User[]> {
 
 // ── Plans ─────────────────────────────────────────────────────────────────────
 const DEFAULT_PLANS: Plan[] = [
-  { id: 'free', name: 'Free', price: 0, tokensPerDay: 500, features: ['500 chars/day', '3 accents', 'MP3 only', 'Basic quality'] },
+  { id: 'free', name: 'Free', price: 0, priceNgn: 0, tokensPerDay: 500, features: ['500 chars/day', '3 accents', 'MP3 only', 'Basic quality'] },
   { id: 'starter', name: 'Starter', price: 5, tokensPerDay: 5000, popular: false, features: ['5,000 chars/day', 'All accents', 'MP3 + WAV', 'Voice cloning'] },
   { id: 'pro', name: 'Pro', price: 15, tokensPerDay: 25000, popular: true, features: ['25,000 chars/day', 'All accents', 'MP3 + WAV', 'Voice cloning', 'Priority queue', 'Vocal cues'] },
   { id: 'enterprise', name: 'Enterprise', price: 49, tokensPerDay: 200000, popular: false, features: ['200,000 chars/day', 'All accents', 'All formats', 'Unlimited cloning', 'API access', 'Dedicated support'] },
@@ -135,4 +136,12 @@ export async function putPayment(env: Env, rec: PaymentRecord): Promise<void> {
 
 export async function getPayment(env: Env, txRef: string): Promise<PaymentRecord | null> {
   return env.KV.get<PaymentRecord>(keys.payment(txRef), 'json')
+}
+
+export async function getVoiceSamples(env: Env): Promise<VoiceSample[]> {
+  return await env.KV.get<VoiceSample[]>(keys.voices(), 'json') ?? []
+}
+
+export async function putVoiceSamples(env: Env, voices: VoiceSample[]): Promise<void> {
+  await env.KV.put(keys.voices(), JSON.stringify(voices))
 }

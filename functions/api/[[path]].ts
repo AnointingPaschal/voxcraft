@@ -1,6 +1,6 @@
 import type { Env, User, Plan } from './types'
 import { registerEmail, loginEmail, getGoogleAuthUrl, handleGoogleCallback, requireAuth, requireAdmin, sanitize } from './auth'
-import { getSiteConfig, putSiteConfig, getPlans, putPlans, getUser, putUser, listUsers, incrementUsage, getUsage } from './kv'
+import { getSiteConfig, putSiteConfig, getPlans, putPlans, getUser, putUser, listUsers, incrementUsage, getUsage, getVoiceSamples, putVoiceSamples } from './kv'
 import { initializePayment, verifyAndActivate, handleWebhook } from './flutterwave'
 
 // Pages Functions use EventContext — same KV/secrets bindings, different export shape
@@ -98,6 +98,11 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     return json(await getPlans(env))
   }
 
+  if (path === '/api/voices' && req.method === 'GET') {
+    const voices = await getVoiceSamples(env)
+    return json(voices.map(({ audioDataUrl, ...voice }) => ({ ...voice, audioDataUrl })))
+  }
+
   // ── Usage ─────────────────────────────────────────────────────────────────
   if (path === '/api/usage' && req.method === 'GET') {
     const user = await requireAuth(env, req)
@@ -173,12 +178,13 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
   if (path === '/api/payment/init' && req.method === 'POST') {
     const user = await requireAuth(env, req)
     if (!user) return e('Unauthorized', 401)
-    const { planId } = await req.json() as { planId: string }
+    const { planId, currency = 'USD' } = await req.json() as { planId: string; currency?: 'USD' | 'NGN' }
     const plans = await getPlans(env)
     const plan = plans.find(p => p.id === planId)
     if (!plan) return e('Invalid plan.')
-    if (plan.price === 0) return e('Free plan requires no payment.')
-    const result = await initializePayment(env, user, plan, 'https://voicera.pages.dev/billing/callback')
+    if (currency !== 'USD' && currency !== 'NGN') return e('Unsupported currency.')
+    if ((currency === 'USD' ? plan.price : plan.priceNgn) === 0) return e('Free plan requires no payment.')
+    const result = await initializePayment(env, user, plan, 'https://voicera.pages.dev/billing/callback', currency)
     if ('error' in result) return e(result.error)
     return json(result)
   }
@@ -202,6 +208,14 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const admin = await requireAdmin(env, req)
     if (!admin) return e('Forbidden', 403)
 
+    if (path === '/api/admin/voices' && req.method === 'GET') return json(await getVoiceSamples(env))
+    if (path === '/api/admin/voices' && req.method === 'PUT') {
+      const voices = await req.json() as import('./types').VoiceSample[]
+      if (!Array.isArray(voices) || voices.length > 12) return e('Add up to 12 sample voices.')
+      if (voices.some(v => !v.name?.trim() || !/^data:audio\//.test(v.audioDataUrl) || v.audioDataUrl.length > 1_500_000)) return e('Each voice needs a name and an audio sample under 1 MB.')
+      await putVoiceSamples(env, voices)
+      return json({ success: true })
+    }
     if (path === '/api/admin/config' && req.method === 'GET') return json(await getSiteConfig(env))
     if (path === '/api/admin/config' && req.method === 'PATCH') {
       const body = await req.json() as Record<string, unknown>

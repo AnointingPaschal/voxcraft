@@ -61,10 +61,13 @@ export interface SiteConfig {
   maintenanceMode: boolean
 }
 
+export interface VoiceSample { id: string; name: string; accent: string; description: string; audioDataUrl: string; updatedAt: number }
+
 export interface Plan {
   id: 'free' | 'starter' | 'pro' | 'enterprise'
   name: string
   price: number
+  priceNgn?: number
   tokensPerDay: number
   features: string[]
   popular?: boolean
@@ -72,6 +75,10 @@ export interface Plan {
 
 export async function getPublicConfig(): Promise<SiteConfig> {
   return handle(await fetch(`${BASE}/config`))
+}
+
+export async function getVoiceSamples(): Promise<VoiceSample[]> {
+  return handle(await fetch(`${BASE}/voices`))
 }
 
 export async function getPlans(): Promise<Plan[]> {
@@ -104,8 +111,8 @@ export async function synthesize(body: Record<string, unknown>): Promise<{ blob:
 }
 
 // ── Payment ───────────────────────────────────────────────────────────────────
-export async function initPayment(planId: string): Promise<{ link: string; txRef: string }> {
-  return handle(await fetch(`${BASE}/payment/init`, { method: 'POST', headers: headers(), body: JSON.stringify({ planId }) }))
+export async function initPayment(planId: string, currency: 'USD' | 'NGN' = 'USD'): Promise<{ link: string; txRef: string }> {
+  return handle(await fetch(`${BASE}/payment/init`, { method: 'POST', headers: headers(), body: JSON.stringify({ planId, currency }) }))
 }
 
 export async function verifyPayment(txRef: string): Promise<{ success: boolean; plan: string; user: AuthUser }> {
@@ -147,6 +154,14 @@ export async function adminGetConfig(): Promise<FullSiteConfig> {
 
 export async function adminPatchConfig(patch: Partial<FullSiteConfig>): Promise<FullSiteConfig> {
   return handle(await fetch(`${BASE}/admin/config`, { method: 'PATCH', headers: headers(), body: JSON.stringify(patch) }))
+}
+
+export async function adminGetVoiceSamples(): Promise<VoiceSample[]> {
+  return handle(await fetch(`${BASE}/admin/voices`, { headers: headers() }))
+}
+
+export async function adminPutVoiceSamples(voices: VoiceSample[]): Promise<void> {
+  return handle(await fetch(`${BASE}/admin/voices`, { method: 'PUT', headers: headers(), body: JSON.stringify(voices) }))
 }
 
 export async function adminGetPlans(): Promise<Plan[]> {

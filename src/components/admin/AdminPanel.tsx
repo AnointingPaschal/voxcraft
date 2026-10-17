@@ -4,17 +4,18 @@ import {
   LayoutDashboard, Globe, Key, Chrome, Banknote, ShieldCheck,
   CreditCard, Users, Save, Loader2, CheckCircle2, Eye, EyeOff,
   ChevronDown, ChevronUp, ArrowLeft, AudioWaveform, Menu,
-  TrendingUp, UserCheck, Zap, AlertTriangle, Palette, Settings,
+  TrendingUp, UserCheck, Zap, AlertTriangle, Palette, Settings, Trash2, Upload,
   type LucideIcon,
 } from 'lucide-react'
+import ThemeToggle from '../ThemeToggle'
 import {
   adminGetConfig, adminPatchConfig, adminGetPlans, adminPutPlans,
   adminGetUsers, adminPatchUser, adminGetStats,
-  type FullSiteConfig, type Plan, type AuthUser, type AdminStats,
+  type FullSiteConfig, type Plan, type AuthUser, type AdminStats, type VoiceSample, adminGetVoiceSamples, adminPutVoiceSamples,
 } from '../../lib/api'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-type Tab = 'overview' | 'site' | 'voice' | 'google' | 'payments' | 'security' | 'plans' | 'users'
+type Tab = 'overview' | 'site' | 'voice' | 'samples' | 'google' | 'payments' | 'security' | 'plans' | 'users'
 
 interface NavItem { id: Tab; label: string; icon: LucideIcon, group: string }
 
@@ -23,6 +24,7 @@ const NAV: NavItem[] = [
   { id: 'users',     label: 'Users',      icon: Users,           group: 'Dashboard' },
   { id: 'site',      label: 'Site',       icon: Globe,           group: 'Settings' },
   { id: 'voice',     label: 'Voice API',  icon: AudioWaveform,   group: 'Settings' },
+  { id: 'samples',   label: 'Voice Library', icon: AudioWaveform, group: 'Settings' },
   { id: 'google',    label: 'Google',     icon: Chrome,          group: 'Settings' },
   { id: 'payments',  label: 'Payments',   icon: Banknote,        group: 'Settings' },
   { id: 'plans',     label: 'Plans',      icon: CreditCard,      group: 'Settings' },
@@ -108,6 +110,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             <span className="w-1.5 h-1.5 rounded-full bg-current" />
             Admin
           </div>
+          <ThemeToggle />
         </header>
 
         {/* Page body */}
@@ -119,6 +122,7 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
               {tab === 'overview'  && <OverviewTab />}
               {tab === 'site'      && <ConfigTab section="identity" />}
               {tab === 'voice'     && <ConfigTab section="voice" />}
+              {tab === 'samples'   && <VoiceSamplesTab />}
               {tab === 'google'    && <ConfigTab section="google" />}
               {tab === 'payments'  && <ConfigTab section="flutterwave" />}
               {tab === 'security'  && <ConfigTab section="security" />}
@@ -459,7 +463,7 @@ function PlansTab() {
                     {plan.tokensPerDay.toLocaleString()} chars/day
                   </span>
                   <span className="text-xs" style={{ color: T.dim }}>
-                    {plan.price === 0 ? 'Free' : `$${plan.price}/mo`}
+                    {plan.price === 0 ? 'Free' : `$${plan.price} / ${plan.priceNgn == null ? 'NGN unset' : `₦${plan.priceNgn}`}`}
                   </span>
                 </div>
               </div>
@@ -476,7 +480,8 @@ function PlansTab() {
                   <div className="px-5 py-4 space-y-4">
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Plan Name"><AInput value={plan.name} onChange={v => update(plan.id, { name: v })} /></Field>
-                      <Field label="Price ($/mo)"><AInput value={String(plan.price)} type="number" onChange={v => update(plan.id, { price: Number(v) })} /></Field>
+                      <Field label="Price (USD / month)"><AInput value={String(plan.price)} type="number" onChange={v => update(plan.id, { price: Number(v) })} /></Field>
+                      <Field label="Price (NGN / month)"><AInput value={String(plan.priceNgn ?? '')} type="number" onChange={v => update(plan.id, { priceNgn: v.trim() ? Number(v) : undefined })} /></Field>
                       <Field label="Tokens / Day"><AInput value={String(plan.tokensPerDay)} type="number" onChange={v => update(plan.id, { tokensPerDay: Number(v) })} /></Field>
                       <Field label="Popular Badge">
                         <button type="button" onClick={() => update(plan.id, { popular: !plan.popular })}
@@ -511,6 +516,76 @@ function PlansTab() {
       <SaveButton saving={saving} saved={saved} onClick={() => { void handleSave() }} />
     </div>
   )
+}
+
+
+function VoiceSamplesTab() {
+  const [voices, setVoices] = useState<VoiceSample[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState('')
+  const [accent, setAccent] = useState('')
+  const [description, setDescription] = useState('')
+  const [audioDataUrl, setAudioDataUrl] = useState('')
+  const [fileName, setFileName] = useState('')
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => { adminGetVoiceSamples().then(setVoices).catch(e => setError(e instanceof Error ? e.message : 'Could not load voices')).finally(() => setLoading(false)) }, [])
+
+  function readAudio(file?: File) {
+    if (!file) return
+    if (!file.type.startsWith('audio/')) { setError('Choose an audio file.'); return }
+    if (file.size > 1_000_000) { setError('Keep sample files under 1 MB.'); return }
+    const reader = new FileReader()
+    reader.onload = () => { setAudioDataUrl(String(reader.result)); setFileName(file.name); setError('') }
+    reader.readAsDataURL(file)
+  }
+
+  async function save(next: VoiceSample[]) {
+    setSaving(true); setError(''); setSaved(false)
+    try { await adminPutVoiceSamples(next); setVoices(next); setSaved(true); setTimeout(() => setSaved(false), 2200); return true }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not save voices.'); return false }
+    finally { setSaving(false) }
+  }
+
+  async function addVoice(e: FormEvent) {
+    e.preventDefault()
+    if (!name.trim() || !audioDataUrl) { setError('Add a voice name and audio sample first.'); return }
+    if (voices.length >= 12) { setError('The library supports up to 12 voices.'); return }
+    const voice: VoiceSample = { id: crypto.randomUUID(), name: name.trim(), accent: accent.trim(), description: description.trim(), audioDataUrl, updatedAt: Date.now() }
+    if (await save([...voices, voice])) { setName(''); setAccent(''); setDescription(''); setAudioDataUrl(''); setFileName('') }
+  }
+
+  if (loading) return <Spinner />
+  return <div className="space-y-5">
+    <PageHeader title="Voice Library" subtitle="Upload named samples for customers to preview and use in the studio. Up to 12 clips, 1 MB each." />
+    <form onSubmit={e => { void addVoice(e) }} className="rounded-2xl p-5 space-y-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+      <CardTitle icon={<Upload size={14} />} title="Add a sample voice" />
+      <div className="grid sm:grid-cols-2 gap-3">
+        <Field label="Voice name"><AInput value={name} onChange={setName} placeholder="e.g. Amara" /></Field>
+        <Field label="Accent or style"><AInput value={accent} onChange={setAccent} placeholder="Lagos English, warm" /></Field>
+      </div>
+      <Field label="Short description (optional)"><AInput value={description} onChange={setDescription} placeholder="Clear, friendly narration" /></Field>
+      <label className="flex items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm cursor-pointer" style={{ color: T.accent, border: `1px dashed ${T.accentBorder}`, background: T.accentBg }}>
+        <Upload size={15} /> {fileName || 'Choose audio sample'}
+        <input className="hidden" type="file" accept="audio/*" onChange={e => readAudio(e.target.files?.[0])} />
+      </label>
+      {audioDataUrl && <audio className="w-full" controls src={audioDataUrl} />}
+      {error && <p className="text-xs" style={{ color: T.red }}>{error}</p>}
+      <button disabled={saving} className="rounded-xl px-4 py-2.5 text-sm font-bold" style={{ background: T.accent, color: '#07110e', opacity: saving ? .6 : 1 }}>
+        {saving ? 'Saving…' : 'Add voice to library'}
+      </button>
+      {saved && <span className="ml-3 text-xs" style={{ color: T.accent }}>Saved</span>}
+    </form>
+    <div className="space-y-3">
+      {voices.map(voice => <div key={voice.id} className="rounded-2xl p-4 flex flex-col gap-3" style={{ background: T.surface, border: `1px solid ${T.border}` }}>
+        <div className="flex items-start gap-3"><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ color: T.accent, background: T.accentBg }}><AudioWaveform size={18} /></div><div className="min-w-0 flex-1"><div className="font-semibold text-sm" style={{ color: T.text }}>{voice.name}</div><div className="text-xs mt-1" style={{ color: T.muted }}>{[voice.accent, voice.description].filter(Boolean).join(' · ') || 'Sample voice'}</div></div><button type="button" onClick={() => { void save(voices.filter(v => v.id !== voice.id)) }} className="p-2 rounded-lg" style={{ color: T.red }} aria-label={`Delete ${voice.name}`}><Trash2 size={15} /></button></div>
+        <audio className="w-full" controls src={voice.audioDataUrl} />
+      </div>)}
+      {!voices.length && <div className="rounded-2xl p-8 text-center text-sm" style={{ color: T.muted, border: `1px dashed ${T.border}` }}>Your sample voice library is empty.</div>}
+    </div>
+  </div>
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────

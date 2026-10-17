@@ -1,17 +1,18 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Mic, Upload, FileText, Wand2, Play, Download, Loader2,
+  Mic, Upload, FileText, Wand2, Play, Download, Loader2, MessageSquareText,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
   Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, type UsageData } from './lib/api'
+import { synthesize, getUsage, getVoiceSamples, type UsageData, type VoiceSample } from './lib/api'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
 import SetupWizard from './components/auth/SetupWizard'
+import ThemeToggle from './components/ThemeToggle'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ACCENT_OPTIONS = [
@@ -83,6 +84,16 @@ export default function App(): JSX.Element {
   const [needsSetup, setNeedsSetup] = useState(false)
   const [workerDown, setWorkerDown] = useState(false)
   const [kvMissing, setKvMissing] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('vc_theme') as 'light' | 'dark') || 'light')
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('vc_theme', theme)
+    window.dispatchEvent(new Event('vc-theme-changed'))
+    const syncTheme = () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
+    window.addEventListener('vc-theme-changed', syncTheme)
+    return () => window.removeEventListener('vc-theme-changed', syncTheme)
+  }, [theme])
 
   const setPage = (p: Page) => {
     setPageState(p)
@@ -193,86 +204,52 @@ function PageShell({ children }: { children: React.ReactNode }) {
 // ── Home Page ─────────────────────────────────────────────────────────────────
 function HomePage({ onEnter, onSignIn, user, onStudio }: { onEnter: () => void; onSignIn: () => void; user: ReturnType<typeof useAuth>['user']; onStudio: () => void }) {
   const features = [
-    { icon: Globe, title: '10+ African Accents', desc: 'Naija Pidgin, Lagos Executive, Ghanaian, Kenyan, South African and more.' },
-    { icon: Mic, title: 'Voice Print Cloning', desc: "Upload 5\u201315 seconds of audio to clone any speaker's vocal identity." },
-    { icon: Wand2, title: 'Vocal Cue System', desc: 'Insert [laughing], [whispering], [pause] and other emotional markers.' },
-    { icon: Zap, title: 'Studio Quality', desc: 'MP3 44.1kHz and lossless WAV output powered by Fish Audio S2.1 Pro.' },
+    { icon: Globe, title: 'Made for African voices', desc: 'Choose the cadence, accent, and character that fits your story.' },
+    { icon: Mic, title: 'Bring a voice to life', desc: 'Preview curated voices or upload a short reference sample.' },
+    { icon: Wand2, title: 'Direct every moment', desc: 'Add pauses, whispers, laughter, and feeling to your script.' },
+    { icon: Zap, title: 'Ready for production', desc: 'Download crisp MP3 or lossless WAV right from your workspace.' },
   ]
-
   return (
-    <div className="min-h-dvh" style={{ background: 'linear-gradient(160deg, #0a121e 0%, #0d1f2d 60%, #091824 100%)' }}>
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-5 py-4 max-w-3xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)' }}>
-            <AudioWaveform size={16} color="#0a121e" strokeWidth={2.5} />
-          </div>
-          <span className="display font-bold text-base" style={{ color: '#f0faf7' }}>VoxCraft</span>
-          <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(32,210,160,0.12)', color: '#20d2a0', border: '1px solid rgba(32,210,160,0.25)' }}>Studio Pro</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {user ? (
-            <button type="button" onClick={onStudio}
-              className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-              style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e' }}>
-              Open Studio
-            </button>
-          ) : (
-            <button type="button" onClick={onSignIn}
-              className="text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-              style={{ background: 'rgba(255,255,255,0.06)', color: '#f0faf7', border: '1px solid rgba(255,255,255,0.1)' }}>
-              Sign In
-            </button>
-          )}
-        </div>
+    <div className="landing min-h-dvh">
+      <nav className="landing-nav">
+        <a href="/" className="brand-lockup" aria-label="VoxCraft home"><span className="brand-mark"><AudioWaveform size={18} /></span><span>voxcraft</span><span className="brand-dot">STUDIO</span></a>
+        <div className="landing-links"><a href="#studio">Studio</a><a href="#voices">Voices</a><a href="#workflow">How it works</a><a href="/plans">Plans</a></div>
+        <div className="landing-actions"><ThemeToggle />{user ? <button className="button button-primary" onClick={onStudio}>Open studio <ArrowRightIcon /></button> : <button className="button button-quiet" onClick={onSignIn}>Sign in</button>}</div>
       </nav>
 
-      {/* Hero */}
-      <div className="max-w-2xl mx-auto px-5 pt-12 pb-8 text-center">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6 text-xs font-medium"
-            style={{ background: 'rgba(32,210,160,0.08)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
-            <Sparkles size={11} />
-            Powered by Fish Audio S2.1 Pro
+      <main>
+        <section className="hero-section" id="studio">
+          <div className="hero-copy">
+            <div className="eyebrow"><span className="live-dot" /> VOICE, WITH A POINT OF VIEW</div>
+            <h1>Give your words<br />a <em>voice of their own.</em></h1>
+            <p className="hero-lede">A thoughtful voice studio for stories, conversations, and ideas shaped by the sounds of Africa and beyond.</p>
+            <div className="hero-ctas"><button className="button button-primary button-large" onClick={onEnter}>Open the studio <ArrowRightIcon /></button><a className="text-link" href="#voices">Explore the voices <span>↓</span></a></div>
+            <div className="hero-proof"><div className="avatar-stack"><span>AM</span><span>KO</span><span>ZE</span></div><span>Made for the way we speak.</span><span className="proof-sep">·</span><span>Built for the world.</span></div>
           </div>
-          <h1 className="display text-4xl font-bold leading-tight mb-4" style={{ color: '#f0faf7', letterSpacing: '-0.03em' }}>
-            African Voice AI<br />
-            <span style={{ color: '#20d2a0' }}>Studio</span>
-          </h1>
-          <p className="text-base mb-8 max-w-md mx-auto" style={{ color: 'rgba(240,250,247,0.55)', lineHeight: 1.6 }}>
-            Generate studio-quality African-accented speech with voice cloning, vocal cues, and professional mastering.
-          </p>
-          <button type="button" onClick={onEnter}
-            className="px-8 py-4 rounded-2xl font-bold text-base flex items-center gap-2.5 mx-auto"
-            style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e', boxShadow: '0 0 32px rgba(32,210,160,0.25)' }}>
-            <AudioWaveform size={18} />
-            Launch Studio
-          </button>
-        </motion.div>
-      </div>
+          <div className="hero-art" aria-label="VoxCraft audio studio preview">
+            <div className="art-glow" />
+            <div className="studio-preview"><div className="preview-top"><span className="preview-window-dots"><i/><i/><i/></span><span>VOXCRAFT · SESSION 01</span><span className="preview-status"><i/> READY</span></div>
+              <div className="preview-content"><div className="preview-label">YOUR NEXT STORY, IN SOUND</div><div className="preview-title">The morning<br />comes alive.</div><div className="waveform">{Array.from({length: 46}, (_, i) => <i key={i} style={{ height: `${18 + ((i * 37 + 13) % 62)}%` }} />)}</div><div className="preview-player"><button className="play-orb" onClick={onEnter} aria-label="Open studio"><Play size={15} fill="currentColor" /></button><div className="preview-track"><b>Amara · Lagos Executive</b><span>Warm, clear · 0:18</span></div><span className="track-time">00:18</span></div></div>
+              <div className="preview-footer"><span><AudioWaveform size={13}/> FISH AUDIO ENGINE</span><span>MP3 · 44.1 KHZ</span></div>
+            </div>
+            <div className="floating-note"><span className="note-icon"><Sparkles size={14}/></span><span><b>Every accent, intentional.</b><small>Find the right sound.</small></span></div>
+          </div>
+        </section>
 
-      {/* Features */}
-      <div className="max-w-2xl mx-auto px-5 pb-16">
-        <div className="grid grid-cols-2 gap-3">
-          {features.map((f, i) => (
-            <motion.div key={f.title}
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 + i * 0.07 }}
-              className="rounded-2xl p-4"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3"
-                style={{ background: 'rgba(32,210,160,0.1)' }}>
-                <f.icon size={15} style={{ color: '#20d2a0' }} />
-              </div>
-              <div className="text-sm font-semibold mb-1" style={{ color: '#f0faf7' }}>{f.title}</div>
-              <div className="text-xs leading-relaxed" style={{ color: 'rgba(240,250,247,0.45)' }}>{f.desc}</div>
-            </motion.div>
-          ))}
-        </div>
-      </div>
+        <section className="signal-strip"><span>VOICE FOR</span><b>Films & stories</b><i/><b>Learning</b><i/><b>Creators</b><i/><b>Brands</b><i/><b>Everyday ideas</b></section>
+
+        <section className="features-section" id="voices"><div className="section-heading"><div><div className="eyebrow">A STUDIO THAT GETS IT</div><h2>More than words.<br /><em>All the feeling between them.</em></h2></div><p>From the first line to the final listen, shape the sound until it feels like yours.</p></div><div className="feature-grid">{features.map((f, i) => <motion.article key={f.title} className="feature-card" initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * .07 }}><span className="feature-number">0{i + 1}</span><span className="feature-icon"><f.icon size={18}/></span><h3>{f.title}</h3><p>{f.desc}</p></motion.article>)}</div></section>
+
+        <section className="workflow-section" id="workflow"><div className="workflow-copy"><div className="eyebrow">FROM PAGE TO PLAY</div><h2>Your next idea<br />sounds <em>closer.</em></h2><p>Choose a voice, bring your script, and direct the delivery. VoxCraft takes care of the rest, with controls that stay out of your way.</p><button className="button button-primary" onClick={onEnter}>Start creating <ArrowRightIcon /></button></div><div className="workflow-steps"><div><span>01</span><b>Choose your voice</b><small>Preview samples and find a natural fit.</small></div><div><span>02</span><b>Shape the delivery</b><small>Set the pace, mood, and vocal cues.</small></div><div><span>03</span><b>Make it yours</b><small>Synthesize and take your audio anywhere.</small></div></div></section>
+
+        <section className="closing-cta"><div><div className="eyebrow">SOUND LIKE YOURSELF</div><h2>There’s a voice for that.</h2><p>Make something people want to listen to.</p></div><button className="button button-dark" onClick={onEnter}>Step into the studio <ArrowRightIcon /></button></section>
+      </main>
+      <footer className="landing-footer"><a href="/" className="brand-lockup"><span className="brand-mark"><AudioWaveform size={16}/></span><span>voxcraft</span></a><span>Voice, with a point of view.</span><button onClick={onSignIn}>Your workspace <ArrowRightIcon /></button></footer>
     </div>
   )
 }
+
+function ArrowRightIcon() { return <span aria-hidden="true">↗</span> }
 
 // ── Studio Header ─────────────────────────────────────────────────────────────
 function StudioHeader({ user, onLogout, onPlans, onAdmin }: {
@@ -295,7 +272,8 @@ function StudioHeader({ user, onLogout, onPlans, onAdmin }: {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 text-xs" style={{ color: 'rgba(240,250,247,0.5)' }}>
+        <ThemeToggle />
+        <div className="hidden sm:flex items-center gap-1.5 text-xs" style={{ color: 'rgba(240,250,247,0.5)' }}>
           <div className="w-1.5 h-1.5 rounded-full" style={{ background: '#20d2a0', boxShadow: '0 0 6px #20d2a0' }} />
           Acoustic Engine Ready
         </div>
@@ -363,6 +341,9 @@ function StudioBody({ user, onSignIn, onPlans }: {
   onPlans: () => void
 }) {
   const [accent, setAccent] = useState(ACCENT_OPTIONS[0])
+  const [voices, setVoices] = useState<VoiceSample[]>([])
+  const [selectedVoiceId, setSelectedVoiceId] = useState('')
+  const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [timbre, setTimbre] = useState<Timbre>('Male')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0])
   const [pacing, setPacing] = useState(1.0)
@@ -386,6 +367,10 @@ function StudioBody({ user, onSignIn, onPlans }: {
   const startTimeRef = useRef<number>(0)
 
   // Load usage on mount / user change
+  useEffect(() => {
+    getVoiceSamples().then(setVoices).catch(() => null)
+  }, [])
+
   useEffect(() => {
     if (!user) return
     getUsage().then(setUsage).catch(() => null)
@@ -428,6 +413,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
       mr.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' })
         const file = new File([blob], 'recording.webm', { type: 'audio/webm' })
+        setSelectedVoiceId('')
         setReferenceFile(file)
         const reader = new FileReader()
         reader.onload = () => setReferenceDataUrl(reader.result as string)
@@ -450,6 +436,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
 
   function handleFileUpload(file: File) {
     if (file.size > 15 * 1024 * 1024) { toast.error('File must be under 15MB.'); return }
+    setSelectedVoiceId('')
     setReferenceFile(file)
     const reader = new FileReader()
     reader.onload = () => setReferenceDataUrl(reader.result as string)
@@ -473,7 +460,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
       ].filter(Boolean).join(' ')
 
       const { blob, remaining } = await synthesize({
-        text: text.trim(),
+        text: scriptMode === 'conversation' ? `[Two-person conversation. Perform each speaker's lines distinctly and do not read speaker labels aloud.]\n${text.trim()}` : text.trim(),
         format,
         accentInstruction,
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
@@ -493,7 +480,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
       setErrorMsg(msg)
       if (msg.includes('limit') || msg.includes('quota')) onPlans()
     }
-  }, [user, text, format, accent, timbre, perfStyle, pacing, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
+  }, [user, text, scriptMode, format, accent, timbre, perfStyle, pacing, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
   const handleDownload = useCallback(() => {
     if (!audioBlob) return
@@ -506,7 +493,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
   const limitPct = usage ? Math.min((usage.tokensUsed / usage.limit) * 100, 100) : 0
 
   return (
-    <div className="max-w-lg mx-auto px-4 pb-16 pt-4 space-y-4">
+    <div className="studio-layout mx-auto px-4 pb-16 pt-4 space-y-4">
       {/* Usage bar */}
       {user && usage && (
         <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
@@ -528,7 +515,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
       )}
 
       {/* Vocal Profile */}
-      <Section title="Vocal Profile & Regional Accent" icon={<UserIcon size={14} style={{ color: '#20d2a0' }} />}>
+      <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} style={{ color: '#20d2a0' }} />}>
         <FieldLabel>Dialect & Accent</FieldLabel>
         <SelectField value={accent.label} onChange={v => setAccent(ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0])}
           options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
@@ -562,8 +549,10 @@ function StudioBody({ user, onSignIn, onPlans }: {
         </div>
       </Section>
 
+      {voices.length > 0 && <Section title="Sample voices" className="voices-section" icon={<AudioWaveform size={14} style={{ color: '#20d2a0' }} />}><p className="text-xs" style={{ color: 'rgba(240,250,247,0.45)' }}>Preview a studio voice, then use it for your script.</p><div className="voice-grid">{voices.map(voice => <div key={voice.id} className={`voice-card ${selectedVoiceId === voice.id ? 'selected' : ''}`}><button type="button" onClick={() => { setSelectedVoiceId(voice.id); setReferenceDataUrl(voice.audioDataUrl); setReferenceTranscript(''); setReferenceFile(null) }} className="voice-select"><span className="voice-avatar">{voice.name.slice(0,1).toUpperCase()}</span><span className="min-w-0 flex-1 text-left"><span className="block text-sm font-semibold">{voice.name}</span><span className="block text-xs opacity-70 truncate">{[voice.accent, voice.description].filter(Boolean).join(' · ') || 'VoxCraft voice'}</span></span>{selectedVoiceId === voice.id && <CheckCircle2 size={15} />}</button><audio controls preload="none" src={voice.audioDataUrl} aria-label={`Preview ${voice.name}`} /></div>)}</div></Section>}
+
       {/* Voice Cloning */}
-      <Section title="Voice Print Cloning" icon={<Mic size={14} style={{ color: '#20d2a0' }} />}>
+      <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} style={{ color: '#20d2a0' }} />}>
         <p className="text-xs leading-relaxed" style={{ color: 'rgba(240,250,247,0.45)' }}>
           Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker's vocal identity and native inflection.
         </p>
@@ -573,7 +562,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
             style={{ background: 'rgba(32,210,160,0.08)', border: '1px solid rgba(32,210,160,0.2)', color: '#20d2a0' }}>
             <CheckCircle2 size={13} />
             <span className="truncate flex-1">{referenceFile.name}</span>
-            <button type="button" onClick={() => { setReferenceFile(null); setReferenceDataUrl(null) }}>
+            <button type="button" onClick={() => { setReferenceFile(null); setReferenceDataUrl(null); setSelectedVoiceId('') }}>
               <X size={12} />
             </button>
           </div>
@@ -609,7 +598,9 @@ function StudioBody({ user, onSignIn, onPlans }: {
       </Section>
 
       {/* Script Editor */}
-      <Section title="Studio Script Editor" icon={<FileText size={14} style={{ color: '#20d2a0' }} />}>
+      <Section title="Studio Script Editor" className="script-section" icon={<FileText size={14} style={{ color: '#20d2a0' }} />}>
+        <div className="mode-switch"><button type="button" className={scriptMode === 'narration' ? 'active' : ''} onClick={() => setScriptMode('narration')}><FileText size={13} /> Narration</button><button type="button" className={scriptMode === 'conversation' ? 'active' : ''} onClick={() => setScriptMode('conversation')}><MessageSquareText size={13} /> Conversation</button></div>
+        {scriptMode === 'conversation' && <div className="dialogue-hint">Write one turn per line. Example: <b>Speaker A:</b> Hello there!<br /><b>Speaker B:</b> Good to see you.</div>}
         <div className="flex flex-wrap gap-2">
           {SCRIPT_TEMPLATES.map(t => (
             <button key={t.label} type="button" onClick={() => loadTemplate(t)}
@@ -639,7 +630,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
           value={text}
           onChange={e => setText(e.target.value)}
           maxLength={3000}
-          placeholder="Type or paste your script here… Try inserting a vocal cue above."
+          placeholder={scriptMode === 'conversation' ? 'Speaker A: How are you today?\nSpeaker B: I am doing well, thank you.' : 'Type or paste your script here… Try inserting a vocal cue above.'}
           rows={8}
           className="w-full rounded-2xl px-4 py-3 text-sm outline-none border resize-y leading-relaxed"
           style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'rgba(255,255,255,0.08)', color: '#f0faf7', fontFamily: 'inherit', minHeight: 160 }}
@@ -762,9 +753,9 @@ function StudioBody({ user, onSignIn, onPlans }: {
 }
 
 // ── Small helpers ─────────────────────────────────────────────────────────────
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Section({ title, icon, children, className = '' }: { title: string; icon: React.ReactNode; children: React.ReactNode; className?: string }) {
   return (
-    <div className="rounded-2xl p-5 space-y-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+    <div className={`rounded-2xl p-5 space-y-3 ${className}`} style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
       <div className="flex items-center gap-2 mb-1">
         {icon}
         <span className="text-sm font-bold display" style={{ color: '#f0faf7' }}>{title}</span>

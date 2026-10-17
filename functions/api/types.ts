@@ -33,6 +33,7 @@ export interface Plan {
   id: 'free' | 'starter' | 'pro' | 'enterprise'
   name: string
   price: number
+  priceNgn?: number
   tokensPerDay: number
   features: string[]
   popular?: boolean
@@ -81,6 +82,15 @@ export interface JWTPayload {
   plan: string
   iat: number
   exp: number
+}
+
+export interface VoiceSample {
+  id: string
+  name: string
+  accent: string
+  description: string
+  audioDataUrl: string
+  updatedAt: number
 }
 
 export interface PaymentRecord {

@@ -2,15 +2,18 @@ import type { Env, Plan, User, PaymentRecord } from './types'
 import { getUser, putUser, putPayment, getPayment, getSiteConfig } from './kv'
 
 export async function initializePayment(
-  env: Env, user: User, plan: Plan, redirectUrl: string,
+  env: Env, user: User, plan: Plan, redirectUrl: string, currency: 'USD' | 'NGN' = 'USD',
 ): Promise<{ link: string; txRef: string } | { error: string }> {
   const cfg = await getSiteConfig(env)
   if (!cfg.flutterwaveSecretKey) return { error: 'Payment not configured. Contact admin.' }
 
+  const amount = currency === 'NGN' ? plan.priceNgn : plan.price
+  if (typeof amount !== 'number' || amount <= 0) return { error: `This plan is not priced in ${currency}. Please choose another currency or contact support.` }
+
   const txRef = `voxcraft-${user.id}-${Date.now()}`
   const rec: PaymentRecord = {
     id: crypto.randomUUID(), userId: user.id, plan: plan.id,
-    amount: plan.price, currency: 'USD', status: 'pending',
+    amount, currency, status: 'pending',
     txRef, createdAt: Date.now(),
   }
   await putPayment(env, rec)
@@ -19,7 +22,7 @@ export async function initializePayment(
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.flutterwaveSecretKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      tx_ref: txRef, amount: plan.price, currency: 'USD',
+      tx_ref: txRef, amount, currency,
       redirect_url: redirectUrl,
       customer: { email: user.email, name: user.name },
       customizations: {
