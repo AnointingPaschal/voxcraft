@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Mail, Lock, User, Eye, EyeOff, Loader2, AlertCircle, Activity } from 'lucide-react'
 import { register, login, getGoogleUrl } from '../../lib/api'
 import { useAuth } from '../../hooks/useAuth'
+import ThemeToggle from '../ThemeToggle'
 
-interface Props { onSuccess: () => void; initialTab?: 'login' | 'register' }
+interface Props { onSuccess: () => void; initialTab?: 'login' | 'register'; allowThemeToggle?: boolean }
 
-export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
+export default function AuthPage({ onSuccess, initialTab = 'login', allowThemeToggle = true }: Props) {
   const { setAuth } = useAuth()
   const [tab, setTab] = useState<'login' | 'register'>(initialTab)
   const [name, setName] = useState('')
@@ -45,8 +46,12 @@ export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center px-4 py-12"
-      style={{ background: 'linear-gradient(160deg, #0a121e 0%, #0d1f2d 60%, #091824 100%)' }}>
+    <div className="auth-page min-h-dvh flex items-center justify-center px-4 py-12">
+      {/* theme toggle top-right */}
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle enabled={allowThemeToggle} />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
@@ -54,25 +59,20 @@ export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
       >
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3"
-            style={{ background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', boxShadow: '0 0 24px rgba(32,210,160,0.3)' }}>
-            <Activity size={22} color="#0a121e" strokeWidth={2.5} />
+          <div className="auth-logo-wrap w-12 h-12 rounded-2xl flex items-center justify-center mb-3">
+            <Activity size={22} strokeWidth={2.5} className="auth-logo-icon" />
           </div>
-          <h1 className="display text-xl font-bold" style={{ color: '#f0faf7' }}>VoxCraft Studio</h1>
-          <p className="text-xs mt-1" style={{ color: 'rgba(240,250,247,0.45)' }}>African Voice AI</p>
+          <h1 className="display text-xl font-bold auth-heading">VoxCraft Studio</h1>
+          <p className="text-xs mt-1 auth-subtext">African Voice AI</p>
         </div>
 
         {/* Card */}
-        <div className="rounded-2xl p-6" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="auth-card rounded-2xl p-6">
           {/* Tabs */}
-          <div className="flex rounded-xl p-1 mb-6" style={{ background: 'rgba(0,0,0,0.3)' }}>
+          <div className="flex rounded-xl p-1 mb-6 auth-tab-bar">
             {(['login', 'register'] as const).map(t => (
               <button key={t} type="button" onClick={() => { setTab(t); setError('') }}
-                className="flex-1 rounded-lg py-2 text-sm font-semibold capitalize transition-all"
-                style={tab === t
-                  ? { background: 'rgba(32,210,160,0.15)', color: '#20d2a0', border: '1px solid rgba(32,210,160,0.3)' }
-                  : { color: 'rgba(240,250,247,0.45)', border: '1px solid transparent' }
-                }>
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold capitalize transition-all auth-tab${tab === t ? ' active' : ''}`}>
                 {t === 'login' ? 'Sign In' : 'Sign Up'}
               </button>
             ))}
@@ -80,8 +80,7 @@ export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
 
           {/* Google button */}
           <button type="button" onClick={() => { void handleGoogle() }} disabled={googleLoading}
-            className="w-full rounded-xl py-3 flex items-center justify-center gap-3 text-sm font-medium mb-4 transition-all"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)', color: '#f0faf7' }}>
+            className="w-full rounded-xl py-3 flex items-center justify-center gap-3 text-sm font-medium mb-4 transition-all auth-google-btn">
             {googleLoading ? <Loader2 size={16} className="animate-spin" /> : (
               <svg width="16" height="16" viewBox="0 0 24 24">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -94,9 +93,9 @@ export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
           </button>
 
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-            <span className="text-xs" style={{ color: 'rgba(240,250,247,0.3)' }}>or</span>
-            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+            <div className="flex-1 h-px auth-divider" />
+            <span className="text-xs auth-or">or</span>
+            <div className="flex-1 h-px auth-divider" />
           </div>
 
           <form onSubmit={(e) => { void handleSubmit(e) }} className="space-y-3">
@@ -111,8 +110,7 @@ export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
             <div className="relative">
               <InputField icon={<Lock size={14} />} type={showPw ? 'text' : 'password'} placeholder="Password" value={password} onChange={setPassword} />
               <button type="button" onClick={() => setShowPw(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: 'rgba(240,250,247,0.4)' }}>
+                className="absolute right-3 top-1/2 -translate-y-1/2 auth-eye-btn">
                 {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
@@ -120,26 +118,22 @@ export default function AuthPage({ onSuccess, initialTab = 'login' }: Props) {
             <AnimatePresence>
               {error && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2.5"
-                  style={{ background: 'rgba(186,43,76,0.12)', border: '1px solid rgba(186,43,76,0.3)' }}>
-                  <AlertCircle size={13} style={{ color: '#ff6b8a', flexShrink: 0 }} />
-                  <span className="text-xs" style={{ color: '#ff6b8a' }}>{error}</span>
+                  className="flex items-center gap-2 rounded-xl px-3 py-2.5 auth-error">
+                  <AlertCircle size={13} className="flex-shrink-0 auth-error-icon" />
+                  <span className="text-xs auth-error-text">{error}</span>
                 </motion.div>
               )}
             </AnimatePresence>
 
             <button type="submit" disabled={loading}
-              className="w-full rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all mt-1"
-              style={loading
-                ? { background: 'rgba(32,210,160,0.2)', color: 'rgba(32,210,160,0.5)', cursor: 'not-allowed' }
-                : { background: 'linear-gradient(135deg, #20d2a0 0%, #0ea882 100%)', color: '#0a121e', cursor: 'pointer' }}>
+              className={`w-full rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all mt-1 auth-submit${loading ? ' loading' : ''}`}>
               {loading ? <Loader2 size={16} className="animate-spin" /> : null}
               {tab === 'login' ? 'Sign In' : 'Create Account'}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs mt-4" style={{ color: 'rgba(240,250,247,0.3)' }}>
+        <p className="text-center text-xs mt-4 auth-fine-print">
           By continuing, you agree to our Terms of Service.
         </p>
       </motion.div>
@@ -152,17 +146,14 @@ function InputField({ icon, type, placeholder, value, onChange }: {
 }) {
   return (
     <div className="relative flex items-center">
-      <span className="absolute left-3" style={{ color: 'rgba(240,250,247,0.4)' }}>{icon}</span>
+      <span className="absolute left-3 auth-input-icon">{icon}</span>
       <input
         type={type}
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}
         required
-        className="w-full rounded-xl py-3 pl-9 pr-4 text-sm outline-none border transition-colors"
-        style={{ background: 'rgba(0,0,0,0.25)', borderColor: 'rgba(255,255,255,0.1)', color: '#f0faf7', fontFamily: 'inherit' }}
-        onFocus={e => { e.currentTarget.style.borderColor = 'rgba(32,210,160,0.4)' }}
-        onBlur={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)' }}
+        className="w-full rounded-xl py-3 pl-9 pr-4 text-sm outline-none auth-input"
       />
     </div>
   )

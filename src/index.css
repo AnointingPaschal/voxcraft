@@ -546,3 +546,121 @@ button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visi
   border-color:var(--site-border,#dce5dc)!important;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   AUTH PAGE — fully theme-aware, zero hardcoded colours
+   ═══════════════════════════════════════════════════════════════ */
+.auth-page {
+  background: var(--page, #0a121e);
+  transition: background .25s ease, color .25s ease;
+}
+.auth-logo-wrap {
+  background: linear-gradient(135deg, var(--accent,#20d2a0) 0%, var(--accent-hover,#0ea882) 100%);
+  box-shadow: 0 0 24px color-mix(in srgb,var(--accent,#20d2a0) 30%,transparent);
+}
+.auth-logo-icon { color: var(--page,#0a121e); }
+.auth-heading { color: var(--ink,#f0faf7); }
+.auth-subtext { color: color-mix(in srgb,var(--ink,#f0faf7) 45%,transparent); }
+.auth-card {
+  background: color-mix(in srgb,var(--ink,#f0faf7) 4%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent);
+}
+.auth-tab-bar { background: color-mix(in srgb,#000 30%,transparent); }
+:root[data-theme="light"] .auth-tab-bar { background: color-mix(in srgb,var(--site-border) 40%,transparent); }
+.auth-tab { color: color-mix(in srgb,var(--ink,#f0faf7) 45%,transparent); border: 1px solid transparent; }
+.auth-tab.active {
+  background: color-mix(in srgb,var(--accent,#20d2a0) 15%,transparent);
+  color: var(--accent,#20d2a0);
+  border-color: color-mix(in srgb,var(--accent,#20d2a0) 30%,transparent);
+}
+.auth-google-btn {
+  background: color-mix(in srgb,var(--ink,#f0faf7) 6%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ink,#f0faf7) 12%,transparent);
+  color: var(--ink,#f0faf7);
+}
+.auth-divider { background: color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent); }
+.auth-or { color: color-mix(in srgb,var(--ink,#f0faf7) 30%,transparent); }
+.auth-input-icon { color: color-mix(in srgb,var(--ink,#f0faf7) 40%,transparent); }
+.auth-input {
+  background: color-mix(in srgb,#000 25%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ink,#f0faf7) 10%,transparent);
+  color: var(--ink,#f0faf7);
+  font-family: inherit;
+  transition: border-color .18s;
+}
+.auth-input:focus { border-color: color-mix(in srgb,var(--accent,#20d2a0) 40%,transparent); }
+:root[data-theme="light"] .auth-input {
+  background: var(--site-surface,#fff);
+  border-color: var(--site-border,#dce5dc);
+  color: var(--site-text,#17251f);
+}
+.auth-eye-btn { color: color-mix(in srgb,var(--ink,#f0faf7) 40%,transparent); }
+.auth-error {
+  background: rgba(186,43,76,.12);
+  border: 1px solid rgba(186,43,76,.3);
+}
+.auth-error-icon,.auth-error-text { color: #ff6b8a; }
+.auth-submit {
+  background: linear-gradient(135deg, var(--accent,#20d2a0) 0%, var(--accent-hover,#0ea882) 100%);
+  color: var(--page,#0a121e);
+  cursor: pointer;
+}
+.auth-submit.loading {
+  background: color-mix(in srgb,var(--accent,#20d2a0) 20%,transparent);
+  color: color-mix(in srgb,var(--accent,#20d2a0) 50%,transparent);
+  cursor: not-allowed;
+}
+.auth-fine-print { color: color-mix(in srgb,var(--ink,#f0faf7) 30%,transparent); }
+
+/* ═══════════════════════════════════════════════════════════════
+   PLANS PAGE — fully theme-aware, zero hardcoded colours
+   ═══════════════════════════════════════════════════════════════ */
+.plans-page { color: var(--ink,#f0faf7); }
+.plans-heading { color: var(--ink,#f0faf7); }
+.plans-subtext { color: color-mix(in srgb,var(--ink,#f0faf7) 50%,transparent); }
+.plans-accent { color: var(--accent,#20d2a0); }
+.plans-error {
+  background: rgba(186,43,76,.12);
+  border: 1px solid rgba(186,43,76,.3);
+  color: #ff6b8a;
+}
+.plans-card {
+  background: color-mix(in srgb,var(--ink,#f0faf7) 4%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent);
+}
+.plans-card.popular {
+  background: color-mix(in srgb,var(--accent,#20d2a0) 8%,transparent);
+  border-color: color-mix(in srgb,var(--accent,#20d2a0) 40%,transparent);
+}
+.plans-popular-badge {
+  background: linear-gradient(135deg, var(--accent,#20d2a0) 0%, var(--accent-hover,#0ea882) 100%);
+  color: var(--page,#0a121e);
+}
+.plans-icon-wrap { background: color-mix(in srgb,var(--accent,#20d2a0) 12%,transparent); }
+.plans-card-name { color: var(--ink,#f0faf7); }
+.plans-feature { color: color-mix(in srgb,var(--ink,#f0faf7) 65%,transparent); }
+.plans-current-badge {
+  background: color-mix(in srgb,var(--accent,#20d2a0) 12%,transparent);
+  border: 1px solid color-mix(in srgb,var(--accent,#20d2a0) 30%,transparent);
+  color: var(--accent,#20d2a0);
+}
+.plans-free-badge {
+  background: color-mix(in srgb,var(--ink,#f0faf7) 4%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent);
+  color: color-mix(in srgb,var(--ink,#f0faf7) 40%,transparent);
+}
+.plans-upgrade-btn {
+  background: linear-gradient(135deg, var(--accent,#20d2a0) 0%, var(--accent-hover,#0ea882) 100%);
+  color: var(--page,#0a121e);
+}
+.plans-upgrade-btn.disabled {
+  background: color-mix(in srgb,var(--accent,#20d2a0) 10%,transparent);
+  color: color-mix(in srgb,var(--accent,#20d2a0) 50%,transparent);
+  cursor: not-allowed;
+}
+.plans-back-btn {
+  color: color-mix(in srgb,var(--ink,#f0faf7) 40%,transparent);
+  border: 1px solid color-mix(in srgb,var(--ink,#f0faf7) 6%,transparent);
+  background: transparent;
+}
+.plans-fine-print { color: color-mix(in srgb,var(--ink,#f0faf7) 25%,transparent); }
+

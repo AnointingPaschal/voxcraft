@@ -78,36 +78,70 @@ function navigate(path: string) {
   window.history.pushState({}, '', path)
 }
 
-// ── Apply siteConfig palette to CSS custom properties ─────────────────────────
+// ── Apply siteConfig palette to ALL CSS custom properties across the site ──────
 function applyPalette(palette: SiteConfig['lightPalette'] | undefined) {
   if (!palette) return
   const r = document.documentElement
+  const bg   = palette.background
+  const surf = palette.surface
+  const txt  = palette.text
+  const mut  = palette.muted
+  const bdr  = palette.border
+  const acc  = palette.accent
+
+  // Derive a semi-transparent surface for hover/card states
   const map: [string, string][] = [
-    ['--site-bg', palette.background],
-    ['--site-surface', palette.surface],
-    ['--site-text', palette.text],
-    ['--site-muted', palette.muted],
-    ['--site-border', palette.border],
-    ['--site-accent', palette.accent],
-    // alias all other token names so every page picks them up
-    ['--bg', palette.background],
-    ['--page', palette.background],
-    ['--paper', palette.surface],
-    ['--paper-2', palette.surface],
-    ['--surface', palette.surface],
-    ['--ink', palette.text],
-    ['--ink-soft', palette.text],
-    ['--muted-ink', palette.muted],
-    ['--line', palette.border],
-    ['--border', palette.border],
-    ['--accent', palette.accent],
-    ['--accent-deep', palette.accent],
-    ['--land-bg', palette.background],
-    ['--land-panel', palette.surface],
-    ['--land-ink', palette.text],
-    ['--land-muted', palette.muted],
-    ['--land-line', palette.border],
-    ['--land-accent', palette.accent],
+    // ── canonical site tokens ──
+    ['--site-bg',      bg],
+    ['--site-surface', surf],
+    ['--site-text',    txt],
+    ['--site-muted',   mut],
+    ['--site-border',  bdr],
+    ['--site-accent',  acc],
+    // ── generic token aliases used everywhere ──
+    ['--bg',           bg],
+    ['--page',         bg],
+    ['--paper',        surf],
+    ['--paper-2',      surf],
+    ['--surface',      surf],
+    ['--ink',          txt],
+    ['--ink-soft',     txt],
+    ['--ink-2',        txt],
+    ['--muted-ink',    mut],
+    ['--subtle',       mut],
+    ['--line',         bdr],
+    ['--border',       bdr],
+    ['--accent',       acc],
+    ['--accent-deep',  acc],
+    ['--accent-hover', acc],
+    // ── landing page tokens ──
+    ['--land-bg',      bg],
+    ['--land-panel',   surf],
+    ['--land-ink',     txt],
+    ['--land-muted',   mut],
+    ['--land-line',    bdr],
+    ['--land-accent',  acc],
+    // ── auth page tokens ──
+    ['--auth-bg',      bg],
+    ['--auth-surface', surf],
+    ['--auth-text',    txt],
+    ['--auth-muted',   mut],
+    ['--auth-border',  bdr],
+    ['--auth-accent',  acc],
+    // ── plans page tokens ──
+    ['--plans-bg',     bg],
+    ['--plans-surface',surf],
+    ['--plans-text',   txt],
+    ['--plans-muted',  mut],
+    ['--plans-border', bdr],
+    ['--plans-accent', acc],
+    // ── admin tokens ──
+    ['--admin-bg',     bg],
+    ['--admin-surface',surf],
+    ['--admin-text',   txt],
+    ['--admin-muted',  mut],
+    ['--admin-border', bdr],
+    ['--admin-accent', acc],
   ]
   map.forEach(([k, v]) => r.style.setProperty(k, v))
 }
@@ -231,10 +265,10 @@ export default function App(): JSX.Element {
     return <PageShell><AdminPanel onBack={() => setPage('studio')} /></PageShell>
   }
 
-  if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} />
+  if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} />
   if (page === 'plans') return (
     <PageShell>
-      <PlansPage onBack={() => setPage('studio')} />
+      <PlansPage onBack={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} />
     </PageShell>
   )
   if (page === 'studio') return (
