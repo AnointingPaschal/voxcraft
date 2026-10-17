@@ -631,16 +631,19 @@ function VoiceSamplesTab() {
     if (!script.trim()) { setError('Write a script first.'); return }
     setGenStatus('loading'); setGenAudioUrl(null); setGenAudioBlob(null); setError('')
     try {
-      const genderInstruction = genGender === 'Auto / Match' ? '' :
-        `CRITICAL: Use a ${genGender.toUpperCase()} voice. Speaker MUST sound unmistakably ${genGender.toLowerCase()}. Do NOT use a ${genGender === 'Male' ? 'female' : 'male'} voice.`
-      const accentInstruction = [genderInstruction, accentLabel, genStyle, genSpeed !== 1.0 ? `Speaking pace: ${genSpeed.toFixed(2)}x.` : ''].filter(Boolean).join(' ')
+      // Build a clean instructions string — NOT prepended to the spoken text
+      const parts: string[] = []
+      if (genGender !== 'Auto / Match') parts.push(`Voice gender: ${genGender}.`)
+      if (accentLabel.trim()) parts.push(`Accent and dialect: ${accentLabel.trim()}.`)
+      if (genStyle.trim()) parts.push(`Performance style: ${genStyle.trim()}.`)
+      const accentInstruction = parts.join(' ')
+
       const { blob } = await synthesize({
-        text: script.trim(),
+        text: script.trim(),          // ONLY the user's script — nothing prepended
         format: 'mp3',
-        accentInstruction,
-        speed: genSpeed,
+        accentInstruction: accentInstruction || undefined,
+        speed: genSpeed,              // passed as API-level speed param
         gender: genGender === 'Auto / Match' ? undefined : genGender.toLowerCase(),
-        // Use uploaded reference audio to clone the voice
         ...(refDataUrl ? { referenceAudioDataUrl: refDataUrl, referenceTranscript: refTranscript } : {}),
       })
       setGenAudioUrl(URL.createObjectURL(blob))

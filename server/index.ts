@@ -50,6 +50,8 @@ const server = http.createServer(async (req, res) => {
         const data = JSON.parse(body) as {
           text?: string;
           accentInstruction?: string;
+          speed?: number;
+          gender?: string;
           format?: string;
           referenceAudioDataUrl?: string;
           referenceTranscript?: string;
@@ -58,6 +60,7 @@ const server = http.createServer(async (req, res) => {
         const {
           text,
           accentInstruction,
+          speed,
           format = 'mp3',
           referenceAudioDataUrl,
           referenceTranscript,
@@ -68,15 +71,25 @@ const server = http.createServer(async (req, res) => {
           return res.end(JSON.stringify({ error: 'Please enter a script to synthesize.' }));
         }
 
-        const styledInput = accentInstruction
-          ? `[${accentInstruction}] ${text.trim()}`
-          : text.trim();
+        // Use ONLY the user's script as the spoken input — never prepend bracket instructions
+        // (the model reads them aloud literally). Style/accent go in the instructions field.
+        const spokenText = text.trim();
 
         const payload: Record<string, unknown> = {
           model: 'fish-audio/s2.1-pro-free:free',
-          input: styledInput,
+          input: spokenText,
           response_format: format,
         };
+
+        // Pass style/accent as a separate instructions hint (not spoken)
+        if (accentInstruction?.trim()) {
+          payload.instructions = accentInstruction.trim();
+        }
+
+        // Pass speech speed as an API-level parameter (0.5–2.0; default 1.0)
+        if (typeof speed === 'number' && speed !== 1.0) {
+          payload.speed = Math.max(0.5, Math.min(2.0, speed));
+        }
 
         if (referenceAudioDataUrl) {
           const refs: unknown[] = [
@@ -88,7 +101,7 @@ const server = http.createServer(async (req, res) => {
           payload.input_references = refs;
         }
 
-        console.log(`[VoxCraft] Rendering | clone=${!!referenceAudioDataUrl} | format=${format}`);
+        console.log(`[VoxCraft] Rendering | clone=${!!referenceAudioDataUrl} | speed=${speed ?? 1.0} | format=${format} | instructions=${!!(accentInstruction?.trim())}`);
 
         let upstream = await callUpstreamTTS(payload);
 
@@ -97,10 +110,12 @@ const server = http.createServer(async (req, res) => {
           console.error(`[VoxCraft] Attempt 1 failed (HTTP ${upstream.status}):`, firstErr);
 
           await new Promise((r) => setTimeout(r, 1200));
+          // Fallback: drop instructions but keep speed + clone refs
           const fallback: Record<string, unknown> = {
             model: 'fish-audio/s2.1-pro-free:free',
-            input: text.trim(),
+            input: spokenText,
           };
+          if (payload.speed) fallback.speed = payload.speed;
           if (payload.input_references) fallback.input_references = payload.input_references;
 
           upstream = await callUpstreamTTS(fallback);

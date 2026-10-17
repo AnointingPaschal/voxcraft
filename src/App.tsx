@@ -891,25 +891,20 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     startProgressTimer()
 
     try {
-      // Strong gender instruction to prevent the model from switching gender mid-synthesis
-      const genderInstruction = timbre !== 'Auto / Match'
-        ? `CRITICAL INSTRUCTION: You MUST use a ${timbre.toUpperCase()} voice. The speaker MUST sound unmistakably ${timbre.toLowerCase()}. Do NOT use a ${timbre === 'Male' ? 'female' : 'male'} voice under any circumstances. Gender: ${timbre}.`
-        : ''
-
-      const accentInstruction = [
-        genderInstruction,
-        accent.value,
-        perfStyle,
-        pacing !== 1.0 ? `Speaking pace: ${pacing.toFixed(2)}x — ${pacing < 1 ? 'slower than normal' : 'faster than normal'}.` : '',
-      ].filter(Boolean).join(' ')
+      // Build instructions as a side-channel hint — NEVER prepended to the spoken text
+      // (bracket prefixes get read aloud literally by the TTS model)
+      const instructionParts: string[] = []
+      if (timbre !== 'Auto / Match') instructionParts.push(`Voice gender: ${timbre}.`)
+      if (accent.value?.trim()) instructionParts.push(`Accent and dialect: ${accent.value.trim()}.`)
+      if (perfStyle?.trim()) instructionParts.push(`Performance style: ${perfStyle.trim()}.`)
+      if (scriptMode === 'conversation') instructionParts.push('This is a two-person conversation. Perform each speaker distinctly and do not read speaker labels aloud.')
+      const accentInstruction = instructionParts.join(' ')
 
       const { blob, remaining } = await synthesize({
-        text: scriptMode === 'conversation'
-          ? `[Two-person conversation. Perform each speaker's lines distinctly and do not read speaker labels aloud.]\n${text.trim()}`
-          : text.trim(),
+        text: text.trim(),            // ONLY the user's script — nothing prepended
         format,
-        accentInstruction,
-        speed: pacing,
+        accentInstruction: accentInstruction || undefined,
+        speed: pacing,               // API-level speed param
         gender: timbre === 'Auto / Match' ? undefined : timbre.toLowerCase(),
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
