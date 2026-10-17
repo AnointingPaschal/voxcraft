@@ -576,24 +576,30 @@ function VoiceSamplesTab() {
   const [voices, setVoices] = useState<VoiceSample[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [name, setName] = useState('')
-  const [accent, setAccent] = useState('')
-  const [description, setDescription] = useState('')
-  const [gender, setGender] = useState<VoiceSample['gender']>('neutral')
-  const [audioDataUrl, setAudioDataUrl] = useState('')
-  const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
-  // Admin studio generator
-  const [genScript, setGenScript] = useState('')
+
+  // ── Unified create form ───────────────────────────────────────────────────────
+  const [voiceName, setVoiceName] = useState('')
+  const [accentLabel, setAccentLabel] = useState('Nigerian Standard English accent, educated and clear')
+  const [description, setDescription] = useState('')
+  const [gender] = useState<VoiceSample['gender']>('neutral')
+
+  // Step 1 — upload reference sample for cloning
+  const [refDataUrl, setRefDataUrl] = useState('')
+  const [refFileName, setRefFileName] = useState('')
+  const [refTranscript, setRefTranscript] = useState('')
+
+  // Step 2 — script + generation settings
+  const [script, setScript] = useState('Hello, and thank you for listening. I am recording this audio snippet to help train a natural-sounding AI voice clone. It is important to speak clearly, maintain a steady rhythm, and avoid rushing through the sentences.')
   const [genGender, setGenGender] = useState<'Male' | 'Female' | 'Auto / Match'>('Female')
-  const [genAccent, setGenAccent] = useState('Nigerian Standard English accent, educated and clear')
   const [genStyle, setGenStyle] = useState('Natural & Conversational')
   const [genSpeed, setGenSpeed] = useState(1.0)
+
+  // Step 3 — preview
   const [genStatus, setGenStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [genAudioUrl, setGenAudioUrl] = useState<string | null>(null)
   const [genAudioBlob, setGenAudioBlob] = useState<Blob | null>(null)
-  const [genSaveName, setGenSaveName] = useState('')
 
   useEffect(() => {
     adminGetVoiceSamples()
@@ -602,12 +608,12 @@ function VoiceSamplesTab() {
       .finally(() => setLoading(false))
   }, [])
 
-  function readAudio(file?: File) {
+  function readRefAudio(file?: File) {
     if (!file) return
     if (!file.type.startsWith('audio/')) { setError('Choose an audio file.'); return }
-    if (file.size > 1_000_000) { setError('Keep sample files under 1 MB.'); return }
+    if (file.size > 2_000_000) { setError('Reference sample must be under 2 MB.'); return }
     const reader = new FileReader()
-    reader.onload = () => { setAudioDataUrl((reader.result as string) ?? ''); setFileName(file.name); setError('') }
+    reader.onload = () => { setRefDataUrl((reader.result as string) ?? ''); setRefFileName(file.name); setError('') }
     reader.readAsDataURL(file)
   }
 
@@ -621,44 +627,53 @@ function VoiceSamplesTab() {
     } finally { setSaving(false) }
   }
 
-  async function addVoice(e: FormEvent) {
-    e.preventDefault()
-    if (!name.trim() || !audioDataUrl) { setError('Add a voice name and audio sample first.'); return }
-    if (voices.length >= 12) { setError('The library supports up to 12 voices.'); return }
-    const voice: VoiceSample = {
-      id: crypto.randomUUID(), name: name.trim(), accent: accent.trim(),
-      description: description.trim(), audioDataUrl, updatedAt: Date.now(), gender,
-    }
-    if (await saveVoices([...voices, voice])) {
-      setName(''); setAccent(''); setDescription(''); setAudioDataUrl(''); setFileName(''); setGender('neutral')
-    }
-  }
-
-  async function generateAdminVoice() {
-    if (!genScript.trim()) return
-    setGenStatus('loading'); setGenAudioUrl(null); setGenAudioBlob(null)
+  async function generatePreview() {
+    if (!script.trim()) { setError('Write a script first.'); return }
+    setGenStatus('loading'); setGenAudioUrl(null); setGenAudioBlob(null); setError('')
     try {
-      const genderInstruction = genGender === 'Auto / Match' ? '' : `CRITICAL: Use a ${genGender.toUpperCase()} voice. Speaker MUST sound unmistakably ${genGender.toLowerCase()}. Do NOT use a ${genGender === 'Male' ? 'female' : 'male'} voice under any circumstances.`
-      const accentInstruction = [genderInstruction, genAccent, genStyle, genSpeed !== 1.0 ? `Speaking pace: ${genSpeed}x.` : ''].filter(Boolean).join(' ')
-      const { blob } = await synthesize({ text: genScript.trim(), format: 'mp3', accentInstruction, speed: genSpeed })
-      const url = URL.createObjectURL(blob)
-      setGenAudioUrl(url); setGenAudioBlob(blob); setGenStatus('done')
+      const genderInstruction = genGender === 'Auto / Match' ? '' :
+        `CRITICAL: Use a ${genGender.toUpperCase()} voice. Speaker MUST sound unmistakably ${genGender.toLowerCase()}. Do NOT use a ${genGender === 'Male' ? 'female' : 'male'} voice.`
+      const accentInstruction = [genderInstruction, accentLabel, genStyle, genSpeed !== 1.0 ? `Speaking pace: ${genSpeed.toFixed(2)}x.` : ''].filter(Boolean).join(' ')
+      const { blob } = await synthesize({
+        text: script.trim(),
+        format: 'mp3',
+        accentInstruction,
+        speed: genSpeed,
+        gender: genGender === 'Auto / Match' ? undefined : genGender.toLowerCase(),
+        // Use uploaded reference audio to clone the voice
+        ...(refDataUrl ? { referenceAudioDataUrl: refDataUrl, referenceTranscript: refTranscript } : {}),
+      })
+      setGenAudioUrl(URL.createObjectURL(blob))
+      setGenAudioBlob(blob)
+      setGenStatus('done')
     } catch (e) {
-      setGenStatus('error'); setError(e instanceof Error ? e.message : 'Generation failed.')
+      setGenStatus('error')
+      setError(e instanceof Error ? e.message : 'Generation failed.')
     }
   }
 
-  function saveGeneratedVoice() {
-    if (!genAudioBlob || !genSaveName.trim()) { setError('Enter a name for the voice preset.'); return }
+  function saveToLibrary() {
+    if (!genAudioBlob) { setError('Generate a preview first.'); return }
+    if (!voiceName.trim()) { setError('Enter a voice name.'); return }
+    if (voices.length >= 12) { setError('The library supports up to 12 voices.'); return }
     const reader = new FileReader()
     reader.onload = () => {
       const dataUrl = reader.result as string
       const voice: VoiceSample = {
-        id: crypto.randomUUID(), name: genSaveName.trim(), accent: genAccent,
-        description: `${genGender} · ${genStyle}`, audioDataUrl: dataUrl, updatedAt: Date.now(),
-        gender: genGender === 'Male' ? 'male' : genGender === 'Female' ? 'female' : 'neutral',
+        id: crypto.randomUUID(),
+        name: voiceName.trim(),
+        accent: accentLabel,
+        description: description.trim() || `${genGender} · ${genStyle}`,
+        audioDataUrl: dataUrl,
+        updatedAt: Date.now(),
+        gender: genGender === 'Male' ? 'male' : genGender === 'Female' ? 'female' : (gender ?? 'neutral'),
       }
-      void saveVoices([...voices, voice]).then(ok => { if (ok) { setGenSaveName(''); setGenAudioUrl(null); setGenAudioBlob(null); setGenStatus('idle'); setGenScript('') } })
+      void saveVoices([...voices, voice]).then(ok => {
+        if (ok) {
+          setVoiceName(''); setScript(''); setRefDataUrl(''); setRefFileName(''); setRefTranscript('')
+          setGenAudioUrl(null); setGenAudioBlob(null); setGenStatus('idle')
+        }
+      })
     }
     reader.readAsDataURL(genAudioBlob)
   }
@@ -667,83 +682,90 @@ function VoiceSamplesTab() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Voice Library" subtitle="Upload or generate named voice presets — up to 12 clips." />
+      <PageHeader title="Voice Library" subtitle="Clone a voice from a sample, generate with your script, and save as a preset." />
 
-      {/* Admin Studio Generator */}
-      <div className="adm-card rounded-2xl p-5 space-y-4">
-        <CardTitle icon={<Mic size={14} />} title="Admin Voice Studio — Generate a preset" />
-        <p className="text-xs adm-dim">Generate a voice using the live TTS engine, preview it, then save it to the library as a preset users can pick.</p>
+      {/* ── Unified create card ── */}
+      <div className="adm-card rounded-2xl p-5 space-y-5">
+        <CardTitle icon={<Mic size={14} />} title="Create Voice Preset" />
+        <p className="text-xs adm-dim">
+          Upload a reference audio clip to clone the voice, write a script, generate a preview with that cloned voice, then save it to the library.
+        </p>
 
+        {/* Step 1 — Voice identity */}
+        <div className="adm-step-label">① Voice identity</div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Gender / Timbre">
+          <Field label="Voice name"><AInput value={voiceName} onChange={setVoiceName} placeholder="e.g. Amara" /></Field>
+          <Field label="Gender">
             <select value={genGender} onChange={e => setGenGender(e.target.value as typeof genGender)} className="adm-select w-full rounded-xl px-3 py-2.5 text-sm outline-none">
               <option>Male</option><option>Female</option><option>Auto / Match</option>
             </select>
           </Field>
-          <Field label="Accent">
-            <AInput value={genAccent} onChange={setGenAccent} placeholder="Nigerian Standard English…" />
-          </Field>
-          <Field label="Performance Style">
-            <AInput value={genStyle} onChange={setGenStyle} placeholder="Natural & Conversational" />
-          </Field>
+          <Field label="Accent / style label"><AInput value={accentLabel} onChange={setAccentLabel} placeholder="Lagos English, warm" /></Field>
+          <Field label="Short description (optional)"><AInput value={description} onChange={setDescription} placeholder="Clear, friendly narration" /></Field>
+        </div>
+
+        {/* Step 2 — Reference sample for cloning */}
+        <div className="adm-step-label">② Upload reference audio to clone <span className="adm-dim font-normal">(optional but recommended)</span></div>
+        <label className="adm-upload-zone flex items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm cursor-pointer">
+          <Upload size={15} />
+          {refFileName ? <span className="truncate max-w-xs">{refFileName}</span> : 'Choose a voice reference clip (max 2 MB)'}
+          <input className="hidden" type="file" accept="audio/*" onChange={e => readRefAudio(e.target.files?.[0])} />
+        </label>
+        {refDataUrl && (
+          <div className="space-y-2">
+            <audio className="w-full" controls src={refDataUrl} />
+            <Field label="Transcript of the reference clip (optional — improves clone accuracy)">
+              <AInput value={refTranscript} onChange={setRefTranscript} placeholder="What the speaker says in the clip…" />
+            </Field>
+          </div>
+        )}
+
+        {/* Step 3 — Generation settings + script */}
+        <div className="adm-step-label">③ Generation settings</div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Performance Style"><AInput value={genStyle} onChange={setGenStyle} placeholder="Natural & Conversational" /></Field>
           <Field label={`Speech Speed: ${genSpeed.toFixed(2)}x`}>
             <input type="range" min={0.5} max={2.0} step={0.05} value={genSpeed} onChange={e => setGenSpeed(Number(e.target.value))} className="w-full adm-range mt-2" />
           </Field>
         </div>
 
-        <Field label="Script to generate">
-          <textarea value={genScript} onChange={e => setGenScript(e.target.value)} rows={3} placeholder="Type the sample text this voice will speak…" className="adm-textarea w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none" />
+        <Field label="Script — the voice will speak this text">
+          <textarea value={script} onChange={e => setScript(e.target.value)} rows={4}
+            placeholder="Write the sample script the voice should speak for the preview…"
+            className="adm-textarea w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none" />
         </Field>
 
-        <button type="button" onClick={() => { void generateAdminVoice() }} disabled={genStatus === 'loading' || !genScript.trim()}
-          className="adm-save-btn rounded-xl px-5 py-2.5 text-sm font-bold flex items-center gap-2" style={{ opacity: genStatus === 'loading' ? 0.6 : 1 }}>
+        {/* Generate button */}
+        <button type="button" onClick={() => { void generatePreview() }}
+          disabled={genStatus === 'loading' || !script.trim()}
+          className="adm-save-btn rounded-xl px-5 py-2.5 text-sm font-bold flex items-center gap-2"
+          style={{ opacity: genStatus === 'loading' ? 0.6 : 1 }}>
           {genStatus === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-          {genStatus === 'loading' ? 'Generating…' : 'Generate Preview'}
+          {genStatus === 'loading' ? 'Generating with cloned voice…' : refDataUrl ? 'Generate Preview (clone voice)' : 'Generate Preview'}
         </button>
 
+        {/* Step 4 — Preview + save */}
         {genStatus === 'done' && genAudioUrl && (
-          <div className="space-y-3">
+          <div className="space-y-3 pt-1">
+            <div className="adm-step-label">④ Preview &amp; save to library</div>
             <audio className="w-full" controls src={genAudioUrl} />
-            <div className="flex gap-2">
-              <div className="flex-1"><AInput value={genSaveName} onChange={setGenSaveName} placeholder="Voice preset name (e.g. Amara)" /></div>
-              <button type="button" onClick={() => { void saveGeneratedVoice() }} className="adm-save-btn rounded-xl px-4 py-2.5 text-sm font-bold flex items-center gap-1.5 whitespace-nowrap">
-                <CheckCircle2 size={13} /> Save to Library
+            <div className="flex gap-2 items-center">
+              <div className="flex-1 text-xs adm-muted">
+                {voiceName.trim() ? <>Will save as <b className="adm-text">{voiceName}</b></> : 'Enter voice name above to save'}
+              </div>
+              <button type="button" onClick={saveToLibrary} disabled={saving || !voiceName.trim()}
+                className="adm-save-btn rounded-xl px-4 py-2.5 text-sm font-bold flex items-center gap-1.5 whitespace-nowrap"
+                style={{ opacity: saving || !voiceName.trim() ? 0.55 : 1 }}>
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                {saving ? 'Saving…' : 'Save to Library'}
               </button>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Manual Upload */}
-      <form onSubmit={e => { void addVoice(e) }} className="adm-card rounded-2xl p-5 space-y-3">
-        <CardTitle icon={<Upload size={14} />} title="Upload a voice sample" />
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Voice name"><AInput value={name} onChange={setName} placeholder="e.g. Tinubu" /></Field>
-          <Field label="Accent or style"><AInput value={accent} onChange={setAccent} placeholder="Lagos English, warm" /></Field>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Short description">
-            <AInput value={description} onChange={setDescription} placeholder="Clear, friendly narration" />
-          </Field>
-          <Field label="Gender">
-            <select value={gender} onChange={e => setGender(e.target.value as VoiceSample['gender'])} className="adm-select w-full rounded-xl px-3 py-2.5 text-sm outline-none">
-              <option value="female">Female</option>
-              <option value="male">Male</option>
-              <option value="neutral">Neutral / Auto</option>
-            </select>
-          </Field>
-        </div>
-        <label className="adm-upload-zone flex items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm cursor-pointer">
-          <Upload size={15} /> {fileName || 'Choose audio sample (max 1 MB)'}
-          <input className="hidden" type="file" accept="audio/*" onChange={e => readAudio(e.target.files?.[0])} />
-        </label>
-        {audioDataUrl && <audio className="w-full" controls src={audioDataUrl} />}
         {error && <p className="text-xs adm-error-text">{error}</p>}
-        <button disabled={saving} className="adm-save-btn rounded-xl px-4 py-2.5 text-sm font-bold" style={{ opacity: saving ? 0.6 : 1 }}>
-          {saving ? 'Saving...' : 'Add voice to library'}
-        </button>
-        {saved && <span className="ml-3 text-xs adm-accent">Saved</span>}
-      </form>
+        {saved && <p className="text-xs adm-accent">Saved to library!</p>}
+      </div>
 
       {/* Existing voices */}
       <div className="space-y-3">
