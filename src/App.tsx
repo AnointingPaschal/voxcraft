@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, getVoiceSamples, getPublicConfig, type UsageData, type VoiceSample, type SiteConfig } from './lib/api'
+import { synthesize, getUsage, getVoiceSamples, getPublicConfig, getStudioConfig, type UsageData, type VoiceSample, type SiteConfig, type StudioConfig, DEFAULT_STUDIO_CONFIG } from './lib/api'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
@@ -17,45 +17,12 @@ import SetupWizard from './components/auth/SetupWizard'
 import ThemeToggle from './components/ThemeToggle'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const ACCENT_OPTIONS = [
-  { label: 'Nigerian Pidgin', value: 'Nigerian Pidgin English accent, Naija street style' },
-  { label: 'Nigerian (Standard)', value: 'Nigerian Standard English accent, educated and clear' },
-  { label: 'Lagos Executive', value: 'Lagos professional English, polished Nigerian accent' },
-  { label: 'Ghanaian English', value: 'Ghanaian English accent, West African intonation' },
-  { label: 'Kenyan English', value: 'Kenyan English accent, East African intonation' },
-  { label: 'South African', value: 'South African English accent' },
-  { label: 'Jamaican Patois', value: 'Jamaican Patois accent and cadence' },
-  { label: 'British RP', value: 'British Received Pronunciation, crisp and clear' },
-  { label: 'American Midwest', value: 'American Midwest neutral accent' },
-  { label: 'Middle Eastern / Arabic', value: 'Middle Eastern English accent with Arabic inflection' },
-  { label: 'No accent hint', value: '' },
-]
-
-const TIMBRE_OPTIONS = ['Male', 'Female', 'Auto / Match'] as const
-type Timbre = typeof TIMBRE_OPTIONS[number]
-
-const PERF_STYLES = [
-  'Natural & Conversational',
-  'Broadcast & Authoritative',
-  'Storytelling & Narrative',
-  'Energetic & Excited',
-  'Calm & Soothing',
-  'Documentary',
-  'Corporate & Professional',
-]
-
 const FORMAT_OPTIONS = [
   { label: 'MP3 (Studio 44.1kHz)', value: 'mp3' },
   { label: 'WAV (Lossless)', value: 'wav' },
 ]
 
-const VOCAL_CUES = ['[laughing]', '[sigh]', '[excited]', '[whispering]', '[pause]', '[nervous]', '[crying]']
-
-const SCRIPT_TEMPLATES = [
-  { label: 'Pidgin Broadcast', text: 'How far my people! [laughing] Make una gather here sharp sharp. Dis new studio voice engine sabi speak better Naija Pidgin well well, everything clean without stress!' },
-  { label: 'Lagos Executive', text: 'Good morning, esteemed colleagues. Today, we present an innovative solution that will transform the African technology landscape and deliver measurable value to our stakeholders.' },
-  { label: 'Documentary', text: 'Across the vast savannahs of East Africa, ancient traditions meet the pulse of modern innovation. This is a story of resilience, culture, and the unbreakable human spirit.' },
-]
+type Timbre = string
 
 const SYNTHESIS_STAGES = [
   { label: 'Phonetics', desc: 'Parsing phonemes and stress patterns…' },
@@ -294,7 +261,7 @@ export default function App(): JSX.Element {
   if (page === 'studio') return (
     <PageShell>
       <StudioHeader allowThemeToggle={siteConfig?.allowThemeToggle ?? true} user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} />
-      <StudioBody user={user} onSignIn={() => setPage('auth')} onPlans={() => setPage('plans')} />
+      <StudioBody user={user} onSignIn={() => setPage('auth')} onPlans={() => setPage('plans')} studioConfig={null} />
     </PageShell>
   )
   return <HomePage allowThemeToggle={siteConfig?.allowThemeToggle ?? true} siteConfig={siteConfig} page={page} onNavigate={setPage} onEnter={() => setPage(user ? 'studio' : 'auth')} onSignIn={() => setPage('auth')} user={user} onStudio={() => setPage('studio')} />
@@ -789,18 +756,36 @@ function MenuItem({ icon, label, onClick, danger }: { icon: React.ReactNode; lab
 }
 
 // ── Studio Body ───────────────────────────────────────────────────────────────
-function StudioBody({ user, onSignIn, onPlans }: {
+function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   user: ReturnType<typeof useAuth>['user']
   onSignIn: () => void
   onPlans: () => void
+  studioConfig: StudioConfig | null
 }) {
-  const [accent, setAccent] = useState(ACCENT_OPTIONS[0])
+  const [sc, setSc] = useState<StudioConfig>(DEFAULT_STUDIO_CONFIG)
+
+  useEffect(() => {
+    getStudioConfig().then(loaded => {
+      setSc(loaded)
+      setAccent(loaded.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
+      setPerfStyle(loaded.perfStyles[0] ?? '')
+      setPacing(loaded.speedDefault)
+    }).catch(() => setSc(DEFAULT_STUDIO_CONFIG))
+  }, [])
+
+  const ACCENT_OPTIONS = sc.accentOptions
+  const PERF_STYLES = sc.perfStyles
+  const VOCAL_CUES = sc.vocalCues
+  const SCRIPT_TEMPLATES = sc.scriptTemplates
+  const TIMBRE_OPTIONS = sc.timbreOptions
+
+  const [accent, setAccent] = useState(() => sc.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
   const [voices, setVoices] = useState<VoiceSample[]>([])
   const [selectedVoiceId, setSelectedVoiceId] = useState('')
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [timbre, setTimbre] = useState<Timbre>('Male')
-  const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0])
-  const [pacing, setPacing] = useState(1.0)
+  const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
+  const [pacing, setPacing] = useState(sc.speedDefault)
   const [format, setFormat] = useState('mp3')
   const [text, setText] = useState('')
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
@@ -853,9 +838,10 @@ function StudioBody({ user, onSignIn, onPlans }: {
   }, [])
 
   const loadTemplate = useCallback((t: typeof SCRIPT_TEMPLATES[number]) => {
-    setAccent(ACCENT_OPTIONS.find(a => a.label === t.label) ?? ACCENT_OPTIONS[0])
+    setAccent(prev => ACCENT_OPTIONS.find(a => a.label === t.label) ?? prev)
     setText(t.text)
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ACCENT_OPTIONS])
 
   async function startRecording() {
     try {
@@ -905,11 +891,16 @@ function StudioBody({ user, onSignIn, onPlans }: {
     startProgressTimer()
 
     try {
+      // Strong gender instruction to prevent the model from switching gender mid-synthesis
+      const genderInstruction = timbre !== 'Auto / Match'
+        ? `CRITICAL INSTRUCTION: You MUST use a ${timbre.toUpperCase()} voice. The speaker MUST sound unmistakably ${timbre.toLowerCase()}. Do NOT use a ${timbre === 'Male' ? 'female' : 'male'} voice under any circumstances. Gender: ${timbre}.`
+        : ''
+
       const accentInstruction = [
+        genderInstruction,
         accent.value,
-        timbre !== 'Auto / Match' ? `${timbre} voice.` : '',
         perfStyle,
-        pacing !== 1.0 ? `Speaking pace: ${pacing}x.` : '',
+        pacing !== 1.0 ? `Speaking pace: ${pacing.toFixed(2)}x — ${pacing < 1 ? 'slower than normal' : 'faster than normal'}.` : '',
       ].filter(Boolean).join(' ')
 
       const { blob, remaining } = await synthesize({
@@ -918,6 +909,8 @@ function StudioBody({ user, onSignIn, onPlans }: {
           : text.trim(),
         format,
         accentInstruction,
+        speed: pacing,
+        gender: timbre === 'Auto / Match' ? undefined : timbre.toLowerCase(),
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
 
@@ -935,6 +928,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
       setErrorMsg(msg)
       if (msg.includes('limit') || msg.includes('quota')) onPlans()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, text, scriptMode, format, accent, timbre, perfStyle, pacing, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
   const handleDownload = useCallback(() => {
@@ -973,7 +967,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
           options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
 
         <FieldLabel>Vocal Timbre</FieldLabel>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {TIMBRE_OPTIONS.map(t => (
             <button key={t} type="button" onClick={() => setTimbre(t)}
               className={`timbre-btn flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all${timbre === t ? ' active' : ''}`}>
@@ -988,7 +982,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
         <div className="flex items-end gap-4">
           <div className="flex-1">
             <FieldLabel>Pacing <span className="tabular-nums pacing-val">{pacing.toFixed(2)}x</span></FieldLabel>
-            <input type="range" min={0.5} max={2.0} step={0.05} value={pacing} onChange={e => setPacing(Number(e.target.value))}
+            <input type="range" min={sc.speedMin} max={sc.speedMax} step={0.05} value={pacing} onChange={e => setPacing(Number(e.target.value))}
               className="w-full h-1 rounded-full studio-range" />
           </div>
           <div className="w-40">
@@ -1096,7 +1090,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          maxLength={3000}
+          maxLength={sc.maxChars}
           placeholder={scriptMode === 'conversation'
             ? 'Speaker A: How are you today?\nSpeaker B: I am doing well, thank you.'
             : 'Type or paste your script here… Try inserting a vocal cue above.'}
@@ -1107,7 +1101,7 @@ function StudioBody({ user, onSignIn, onPlans }: {
         />
 
         <div className="flex items-center justify-between -mt-1">
-          <span className="text-xs tabular-nums studio-char-count">{charsUsed} / 3,000 characters</span>
+          <span className="text-xs tabular-nums studio-char-count">{charsUsed} / {sc.maxChars.toLocaleString()} characters</span>
           <button type="button" onClick={() => setText('')} className="text-xs flex items-center gap-1 transition-colors studio-clear-btn">
             <X size={11} /> Clear Script
           </button>

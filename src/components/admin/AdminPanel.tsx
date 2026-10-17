@@ -6,28 +6,33 @@ import {
   ChevronDown, ChevronUp, ArrowLeft, AudioWaveform, Menu,
   TrendingUp, UserCheck, Zap, AlertTriangle, Palette, Settings, Trash2, Upload,
   Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle,
+  Mic, Play, Sliders, X, Plus,
   type LucideIcon,
 } from 'lucide-react'
 import ThemeToggle from '../ThemeToggle'
 import {
   adminGetConfig, adminPatchConfig, adminGetPlans, adminPutPlans,
   adminGetUsers, adminPatchUser, adminGetStats,
-  type FullSiteConfig, type Plan, type AuthUser, type AdminStats, type VoiceSample, adminGetVoiceSamples, adminPutVoiceSamples,
+  adminGetStudioConfig, adminPutStudioConfig, synthesize,
+  type FullSiteConfig, type Plan, type AuthUser, type AdminStats,
+  type VoiceSample, type StudioConfig, adminGetVoiceSamples, adminPutVoiceSamples,
+  DEFAULT_STUDIO_CONFIG,
 } from '../../lib/api'
 
-type Tab = 'overview' | 'site' | 'voice' | 'samples' | 'google' | 'payments' | 'security' | 'plans' | 'users'
+type Tab = 'overview' | 'site' | 'voice' | 'samples' | 'studio-controls' | 'google' | 'payments' | 'security' | 'plans' | 'users'
 interface NavItem { id: Tab; label: string; icon: LucideIcon; group: string }
 
 const NAV: NavItem[] = [
-  { id: 'overview',  label: 'Overview',      icon: LayoutDashboard, group: 'Dashboard' },
-  { id: 'users',     label: 'Users',         icon: Users,           group: 'Dashboard' },
-  { id: 'site',      label: 'Site',          icon: Globe,           group: 'Settings' },
-  { id: 'voice',     label: 'Voice API',     icon: AudioWaveform,   group: 'Settings' },
-  { id: 'samples',   label: 'Voice Library', icon: AudioWaveform,   group: 'Settings' },
-  { id: 'google',    label: 'Google',        icon: Chrome,          group: 'Settings' },
-  { id: 'payments',  label: 'Payments',      icon: Banknote,        group: 'Settings' },
-  { id: 'plans',     label: 'Plans',         icon: CreditCard,      group: 'Settings' },
-  { id: 'security',  label: 'Security',      icon: ShieldCheck,     group: 'Settings' },
+  { id: 'overview',        label: 'Overview',        icon: LayoutDashboard, group: 'Dashboard' },
+  { id: 'users',           label: 'Users',           icon: Users,           group: 'Dashboard' },
+  { id: 'site',            label: 'Site',            icon: Globe,           group: 'Settings' },
+  { id: 'voice',           label: 'Voice API',       icon: AudioWaveform,   group: 'Settings' },
+  { id: 'samples',         label: 'Voice Library',   icon: Mic,             group: 'Settings' },
+  { id: 'studio-controls', label: 'Studio Controls', icon: Sliders,         group: 'Settings' },
+  { id: 'google',          label: 'Google',          icon: Chrome,          group: 'Settings' },
+  { id: 'payments',        label: 'Payments',        icon: Banknote,        group: 'Settings' },
+  { id: 'plans',           label: 'Plans',           icon: CreditCard,      group: 'Settings' },
+  { id: 'security',        label: 'Security',        icon: ShieldCheck,     group: 'Settings' },
 ]
 const GROUPS = ['Dashboard', 'Settings']
 
@@ -102,15 +107,16 @@ export default function AdminPanel({ onBack }: { onBack: () => void }) {
             <motion.div key={tab}
               initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.18 }}>
-              {tab === 'overview'  && <OverviewTab />}
-              {tab === 'site'      && <ConfigTab section="identity" />}
-              {tab === 'voice'     && <ConfigTab section="voice" />}
-              {tab === 'samples'   && <VoiceSamplesTab />}
-              {tab === 'google'    && <ConfigTab section="google" />}
-              {tab === 'payments'  && <ConfigTab section="flutterwave" />}
-              {tab === 'security'  && <ConfigTab section="security" />}
-              {tab === 'plans'     && <PlansTab />}
-              {tab === 'users'     && <UsersTab />}
+              {tab === 'overview'        && <OverviewTab />}
+              {tab === 'site'            && <ConfigTab section="identity" />}
+              {tab === 'voice'           && <ConfigTab section="voice" />}
+              {tab === 'samples'         && <VoiceSamplesTab />}
+              {tab === 'studio-controls' && <StudioControlsTab />}
+              {tab === 'google'          && <ConfigTab section="google" />}
+              {tab === 'payments'        && <ConfigTab section="flutterwave" />}
+              {tab === 'security'        && <ConfigTab section="security" />}
+              {tab === 'plans'           && <PlansTab />}
+              {tab === 'users'           && <UsersTab />}
             </motion.div>
           </AnimatePresence>
         </main>
@@ -573,10 +579,21 @@ function VoiceSamplesTab() {
   const [name, setName] = useState('')
   const [accent, setAccent] = useState('')
   const [description, setDescription] = useState('')
+  const [gender, setGender] = useState<VoiceSample['gender']>('neutral')
   const [audioDataUrl, setAudioDataUrl] = useState('')
   const [fileName, setFileName] = useState('')
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  // Admin studio generator
+  const [genScript, setGenScript] = useState('')
+  const [genGender, setGenGender] = useState<'Male' | 'Female' | 'Auto / Match'>('Female')
+  const [genAccent, setGenAccent] = useState('Nigerian Standard English accent, educated and clear')
+  const [genStyle, setGenStyle] = useState('Natural & Conversational')
+  const [genSpeed, setGenSpeed] = useState(1.0)
+  const [genStatus, setGenStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [genAudioUrl, setGenAudioUrl] = useState<string | null>(null)
+  const [genAudioBlob, setGenAudioBlob] = useState<Blob | null>(null)
+  const [genSaveName, setGenSaveName] = useState('')
 
   useEffect(() => {
     adminGetVoiceSamples()
@@ -594,7 +611,7 @@ function VoiceSamplesTab() {
     reader.readAsDataURL(file)
   }
 
-  async function save(next: VoiceSample[]) {
+  async function saveVoices(next: VoiceSample[]) {
     setSaving(true); setError(''); setSaved(false)
     try {
       await adminPutVoiceSamples(next); setVoices(next); setSaved(true)
@@ -610,29 +627,114 @@ function VoiceSamplesTab() {
     if (voices.length >= 12) { setError('The library supports up to 12 voices.'); return }
     const voice: VoiceSample = {
       id: crypto.randomUUID(), name: name.trim(), accent: accent.trim(),
-      description: description.trim(), audioDataUrl, updatedAt: Date.now(),
+      description: description.trim(), audioDataUrl, updatedAt: Date.now(), gender,
     }
-    if (await save([...voices, voice])) {
-      setName(''); setAccent(''); setDescription(''); setAudioDataUrl(''); setFileName('')
+    if (await saveVoices([...voices, voice])) {
+      setName(''); setAccent(''); setDescription(''); setAudioDataUrl(''); setFileName(''); setGender('neutral')
     }
+  }
+
+  async function generateAdminVoice() {
+    if (!genScript.trim()) return
+    setGenStatus('loading'); setGenAudioUrl(null); setGenAudioBlob(null)
+    try {
+      const genderInstruction = genGender === 'Auto / Match' ? '' : `CRITICAL: Use a ${genGender.toUpperCase()} voice. Speaker MUST sound unmistakably ${genGender.toLowerCase()}. Do NOT use a ${genGender === 'Male' ? 'female' : 'male'} voice under any circumstances.`
+      const accentInstruction = [genderInstruction, genAccent, genStyle, genSpeed !== 1.0 ? `Speaking pace: ${genSpeed}x.` : ''].filter(Boolean).join(' ')
+      const { blob } = await synthesize({ text: genScript.trim(), format: 'mp3', accentInstruction, speed: genSpeed })
+      const url = URL.createObjectURL(blob)
+      setGenAudioUrl(url); setGenAudioBlob(blob); setGenStatus('done')
+    } catch (e) {
+      setGenStatus('error'); setError(e instanceof Error ? e.message : 'Generation failed.')
+    }
+  }
+
+  function saveGeneratedVoice() {
+    if (!genAudioBlob || !genSaveName.trim()) { setError('Enter a name for the voice preset.'); return }
+    const reader = new FileReader()
+    reader.onload = () => {
+      const dataUrl = reader.result as string
+      const voice: VoiceSample = {
+        id: crypto.randomUUID(), name: genSaveName.trim(), accent: genAccent,
+        description: `${genGender} · ${genStyle}`, audioDataUrl: dataUrl, updatedAt: Date.now(),
+        gender: genGender === 'Male' ? 'male' : genGender === 'Female' ? 'female' : 'neutral',
+      }
+      void saveVoices([...voices, voice]).then(ok => { if (ok) { setGenSaveName(''); setGenAudioUrl(null); setGenAudioBlob(null); setGenStatus('idle'); setGenScript('') } })
+    }
+    reader.readAsDataURL(genAudioBlob)
   }
 
   if (loading) return <Spinner />
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Voice Library" subtitle="Upload named samples — up to 12 clips, 1 MB each." />
-      <form onSubmit={e => { void addVoice(e) }} className="adm-card rounded-2xl p-5 space-y-3">
-        <CardTitle icon={<Upload size={14} />} title="Add a sample voice" />
+      <PageHeader title="Voice Library" subtitle="Upload or generate named voice presets — up to 12 clips." />
+
+      {/* Admin Studio Generator */}
+      <div className="adm-card rounded-2xl p-5 space-y-4">
+        <CardTitle icon={<Mic size={14} />} title="Admin Voice Studio — Generate a preset" />
+        <p className="text-xs adm-dim">Generate a voice using the live TTS engine, preview it, then save it to the library as a preset users can pick.</p>
+
         <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Voice name"><AInput value={name} onChange={setName} placeholder="e.g. Amara" /></Field>
+          <Field label="Gender / Timbre">
+            <select value={genGender} onChange={e => setGenGender(e.target.value as typeof genGender)} className="adm-select w-full rounded-xl px-3 py-2.5 text-sm outline-none">
+              <option>Male</option><option>Female</option><option>Auto / Match</option>
+            </select>
+          </Field>
+          <Field label="Accent">
+            <AInput value={genAccent} onChange={setGenAccent} placeholder="Nigerian Standard English…" />
+          </Field>
+          <Field label="Performance Style">
+            <AInput value={genStyle} onChange={setGenStyle} placeholder="Natural & Conversational" />
+          </Field>
+          <Field label={`Speech Speed: ${genSpeed.toFixed(2)}x`}>
+            <input type="range" min={0.5} max={2.0} step={0.05} value={genSpeed} onChange={e => setGenSpeed(Number(e.target.value))} className="w-full adm-range mt-2" />
+          </Field>
+        </div>
+
+        <Field label="Script to generate">
+          <textarea value={genScript} onChange={e => setGenScript(e.target.value)} rows={3} placeholder="Type the sample text this voice will speak…" className="adm-textarea w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none" />
+        </Field>
+
+        <button type="button" onClick={() => { void generateAdminVoice() }} disabled={genStatus === 'loading' || !genScript.trim()}
+          className="adm-save-btn rounded-xl px-5 py-2.5 text-sm font-bold flex items-center gap-2" style={{ opacity: genStatus === 'loading' ? 0.6 : 1 }}>
+          {genStatus === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+          {genStatus === 'loading' ? 'Generating…' : 'Generate Preview'}
+        </button>
+
+        {genStatus === 'done' && genAudioUrl && (
+          <div className="space-y-3">
+            <audio className="w-full" controls src={genAudioUrl} />
+            <div className="flex gap-2">
+              <div className="flex-1"><AInput value={genSaveName} onChange={setGenSaveName} placeholder="Voice preset name (e.g. Amara)" /></div>
+              <button type="button" onClick={() => { void saveGeneratedVoice() }} className="adm-save-btn rounded-xl px-4 py-2.5 text-sm font-bold flex items-center gap-1.5 whitespace-nowrap">
+                <CheckCircle2 size={13} /> Save to Library
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Manual Upload */}
+      <form onSubmit={e => { void addVoice(e) }} className="adm-card rounded-2xl p-5 space-y-3">
+        <CardTitle icon={<Upload size={14} />} title="Upload a voice sample" />
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Voice name"><AInput value={name} onChange={setName} placeholder="e.g. Tinubu" /></Field>
           <Field label="Accent or style"><AInput value={accent} onChange={setAccent} placeholder="Lagos English, warm" /></Field>
         </div>
-        <Field label="Short description (optional)">
-          <AInput value={description} onChange={setDescription} placeholder="Clear, friendly narration" />
-        </Field>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Short description">
+            <AInput value={description} onChange={setDescription} placeholder="Clear, friendly narration" />
+          </Field>
+          <Field label="Gender">
+            <select value={gender} onChange={e => setGender(e.target.value as VoiceSample['gender'])} className="adm-select w-full rounded-xl px-3 py-2.5 text-sm outline-none">
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="neutral">Neutral / Auto</option>
+            </select>
+          </Field>
+        </div>
         <label className="adm-upload-zone flex items-center justify-center gap-2 rounded-xl px-4 py-4 text-sm cursor-pointer">
-          <Upload size={15} /> {fileName || 'Choose audio sample'}
+          <Upload size={15} /> {fileName || 'Choose audio sample (max 1 MB)'}
           <input className="hidden" type="file" accept="audio/*" onChange={e => readAudio(e.target.files?.[0])} />
         </label>
         {audioDataUrl && <audio className="w-full" controls src={audioDataUrl} />}
@@ -642,6 +744,8 @@ function VoiceSamplesTab() {
         </button>
         {saved && <span className="ml-3 text-xs adm-accent">Saved</span>}
       </form>
+
+      {/* Existing voices */}
       <div className="space-y-3">
         {voices.map(voice => (
           <div key={voice.id} className="adm-card rounded-2xl p-4 flex flex-col gap-3">
@@ -652,11 +756,11 @@ function VoiceSamplesTab() {
               <div className="min-w-0 flex-1">
                 <div className="font-semibold text-sm adm-text">{voice.name}</div>
                 <div className="text-xs mt-1 adm-muted">
-                  {[voice.accent, voice.description].filter(Boolean).join(' · ') || 'Sample voice'}
+                  {[voice.gender && `${voice.gender}`, voice.accent, voice.description].filter(Boolean).join(' · ') || 'Sample voice'}
                 </div>
               </div>
               <button type="button"
-                onClick={() => { void save(voices.filter(v => v.id !== voice.id)) }}
+                onClick={() => { void saveVoices(voices.filter(v => v.id !== voice.id)) }}
                 className="p-2 rounded-lg adm-danger-btn" aria-label={`Delete ${voice.name}`}>
                 <Trash2 size={15} />
               </button>
@@ -670,6 +774,136 @@ function VoiceSamplesTab() {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Studio Controls ────────────────────────────────────────────────────────────
+function StudioControlsTab() {
+  const [cfg, setCfg] = useState<StudioConfig>(DEFAULT_STUDIO_CONFIG)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    adminGetStudioConfig().then(setCfg).catch(console.error).finally(() => setLoading(false))
+  }, [])
+
+  async function handleSave() {
+    setSaving(true); setSaved(false); setError('')
+    try { await adminPutStudioConfig(cfg); setSaved(true); setTimeout(() => setSaved(false), 2500) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Save failed.') }
+    finally { setSaving(false) }
+  }
+
+  if (loading) return <Spinner />
+
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Studio Controls" subtitle="Manage every option users see in the voice studio" />
+
+      {/* Accent Options */}
+      <div className="adm-card rounded-2xl p-5 space-y-4">
+        <CardTitle icon={<Mic size={14} />} title="Dialect & Accent Options" />
+        <p className="text-xs adm-dim">Each row: Display label | Prompt instruction sent to the AI. Users pick by label.</p>
+        <div className="space-y-2">
+          {cfg.accentOptions.map((opt, i) => (
+            <div key={i} className="flex gap-2 items-start">
+              <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                <input className="adm-input rounded-lg px-3 py-2 text-xs outline-none" placeholder="Label" value={opt.label}
+                  onChange={e => { const next = [...cfg.accentOptions]; next[i] = { ...next[i], label: e.target.value }; setCfg({ ...cfg, accentOptions: next }) }} />
+                <input className="adm-input rounded-lg px-3 py-2 text-xs outline-none" placeholder="Prompt instruction (leave blank for no hint)" value={opt.value}
+                  onChange={e => { const next = [...cfg.accentOptions]; next[i] = { ...next[i], value: e.target.value }; setCfg({ ...cfg, accentOptions: next }) }} />
+              </div>
+              <button type="button" onClick={() => setCfg({ ...cfg, accentOptions: cfg.accentOptions.filter((_, j) => j !== i) })}
+                className="p-2 rounded-lg adm-danger-btn mt-1"><X size={13} /></button>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => setCfg({ ...cfg, accentOptions: [...cfg.accentOptions, { label: '', value: '' }] })}
+          className="flex items-center gap-1.5 text-xs adm-accent adm-add-btn px-3 py-2 rounded-lg"><Plus size={12} /> Add Accent</button>
+      </div>
+
+      {/* Performance Styles */}
+      <div className="adm-card rounded-2xl p-5 space-y-3">
+        <CardTitle icon={<Sliders size={14} />} title="Performance Styles" />
+        <div className="space-y-2">
+          {cfg.perfStyles.map((s, i) => (
+            <div key={i} className="flex gap-2">
+              <input className="adm-input rounded-lg px-3 py-2 text-xs outline-none flex-1" value={s}
+                onChange={e => { const next = [...cfg.perfStyles]; next[i] = e.target.value; setCfg({ ...cfg, perfStyles: next }) }} />
+              <button type="button" onClick={() => setCfg({ ...cfg, perfStyles: cfg.perfStyles.filter((_, j) => j !== i) })}
+                className="p-2 rounded-lg adm-danger-btn"><X size={13} /></button>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => setCfg({ ...cfg, perfStyles: [...cfg.perfStyles, ''] })}
+          className="flex items-center gap-1.5 text-xs adm-accent adm-add-btn px-3 py-2 rounded-lg"><Plus size={12} /> Add Style</button>
+      </div>
+
+      {/* Vocal Cues */}
+      <div className="adm-card rounded-2xl p-5 space-y-3">
+        <CardTitle icon={<Mic size={14} />} title="Vocal Cues" />
+        <p className="text-xs adm-dim">These appear as quick-insert chips above the script editor. Format: [cue]</p>
+        <div className="flex flex-wrap gap-2">
+          {cfg.vocalCues.map((cue, i) => (
+            <div key={i} className="flex items-center gap-1 adm-metric-icon rounded-lg px-2 py-1">
+              <span className="text-xs adm-text">{cue}</span>
+              <button type="button" onClick={() => setCfg({ ...cfg, vocalCues: cfg.vocalCues.filter((_, j) => j !== i) })}
+                className="adm-dim hover:adm-error-text"><X size={10} /></button>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input id="new-cue" className="adm-input rounded-lg px-3 py-2 text-xs outline-none flex-1" placeholder="[laughing]" onKeyDown={e => {
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              const val = (e.target as HTMLInputElement).value.trim()
+              if (val) { setCfg({ ...cfg, vocalCues: [...cfg.vocalCues, val] });(e.target as HTMLInputElement).value = '' }
+            }
+          }} />
+          <button type="button" onClick={() => {
+            const inp = document.getElementById('new-cue') as HTMLInputElement
+            if (inp.value.trim()) { setCfg({ ...cfg, vocalCues: [...cfg.vocalCues, inp.value.trim()] }); inp.value = '' }
+          }} className="adm-save-btn rounded-lg px-3 py-2 text-xs font-bold">Add</button>
+        </div>
+      </div>
+
+      {/* Script Templates */}
+      <div className="adm-card rounded-2xl p-5 space-y-4">
+        <CardTitle icon={<Sliders size={14} />} title="Script Templates" />
+        <div className="space-y-3">
+          {cfg.scriptTemplates.map((t, i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="flex gap-2">
+                <input className="adm-input rounded-lg px-3 py-2 text-xs outline-none flex-1" placeholder="Template label" value={t.label}
+                  onChange={e => { const next = [...cfg.scriptTemplates]; next[i] = { ...next[i], label: e.target.value }; setCfg({ ...cfg, scriptTemplates: next }) }} />
+                <button type="button" onClick={() => setCfg({ ...cfg, scriptTemplates: cfg.scriptTemplates.filter((_, j) => j !== i) })}
+                  className="p-2 rounded-lg adm-danger-btn"><X size={13} /></button>
+              </div>
+              <textarea className="adm-textarea w-full rounded-lg px-3 py-2 text-xs outline-none resize-none" rows={2} placeholder="Template text…" value={t.text}
+                onChange={e => { const next = [...cfg.scriptTemplates]; next[i] = { ...next[i], text: e.target.value }; setCfg({ ...cfg, scriptTemplates: next }) }} />
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => setCfg({ ...cfg, scriptTemplates: [...cfg.scriptTemplates, { label: '', text: '' }] })}
+          className="flex items-center gap-1.5 text-xs adm-accent adm-add-btn px-3 py-2 rounded-lg"><Plus size={12} /> Add Template</button>
+      </div>
+
+      {/* Speed & Limits */}
+      <div className="adm-card rounded-2xl p-5 space-y-3">
+        <CardTitle icon={<Sliders size={14} />} title="Speed & Character Limits" />
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Min Speed"><AInput value={String(cfg.speedMin)} type="number" onChange={v => setCfg({ ...cfg, speedMin: Number(v) })} /></Field>
+          <Field label="Max Speed"><AInput value={String(cfg.speedMax)} type="number" onChange={v => setCfg({ ...cfg, speedMax: Number(v) })} /></Field>
+          <Field label="Default Speed"><AInput value={String(cfg.speedDefault)} type="number" onChange={v => setCfg({ ...cfg, speedDefault: Number(v) })} /></Field>
+          <Field label="Max Characters"><AInput value={String(cfg.maxChars)} type="number" onChange={v => setCfg({ ...cfg, maxChars: Number(v) })} /></Field>
+        </div>
+      </div>
+
+      {error && <div className="adm-error flex items-center gap-2 rounded-xl px-4 py-3 text-sm"><AlertTriangle size={14} />{error}</div>}
+      <SaveButton saving={saving} saved={saved} onClick={() => { void handleSave() }} />
     </div>
   )
 }

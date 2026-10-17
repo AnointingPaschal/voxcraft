@@ -74,7 +74,74 @@ export interface SiteConfig {
   contactWhatsapp?: string
 }
 
-export interface VoiceSample { id: string; name: string; accent: string; description: string; audioDataUrl: string; updatedAt: number }
+export interface VoiceSample {
+  id: string
+  name: string
+  accent: string
+  description: string
+  audioDataUrl: string
+  updatedAt: number
+  gender?: 'male' | 'female' | 'neutral'  // gender of the voice preset
+}
+
+// Studio configuration managed by the admin
+export interface AccentOption { label: string; value: string }
+export interface ScriptTemplate { label: string; text: string }
+
+export interface StudioConfig {
+  accentOptions: AccentOption[]
+  perfStyles: string[]
+  vocalCues: string[]
+  scriptTemplates: ScriptTemplate[]
+  timbreOptions: string[]
+  speedMin: number
+  speedMax: number
+  speedDefault: number
+  maxChars: number
+}
+
+const DEFAULT_STUDIO_CONFIG: StudioConfig = {
+  accentOptions: [
+    { label: 'Nigerian Pidgin', value: 'Nigerian Pidgin English accent, Naija street style' },
+    { label: 'Nigerian (Standard)', value: 'Nigerian Standard English accent, educated and clear' },
+    { label: 'Lagos Executive', value: 'Lagos professional English, polished Nigerian accent' },
+    { label: 'Ghanaian English', value: 'Ghanaian English accent, West African intonation' },
+    { label: 'Kenyan English', value: 'Kenyan English accent, East African intonation' },
+    { label: 'South African', value: 'South African English accent' },
+    { label: 'Jamaican Patois', value: 'Jamaican Patois accent and cadence' },
+    { label: 'British RP', value: 'British Received Pronunciation, crisp and clear' },
+    { label: 'American Midwest', value: 'American Midwest neutral accent' },
+    { label: 'Middle Eastern / Arabic', value: 'Middle Eastern English accent with Arabic inflection' },
+    { label: 'No accent hint', value: '' },
+  ],
+  perfStyles: [
+    'Natural & Conversational', 'Broadcast & Authoritative', 'Storytelling & Narrative',
+    'Energetic & Excited', 'Calm & Soothing', 'Documentary', 'Corporate & Professional',
+  ],
+  vocalCues: ['[laughing]', '[sigh]', '[excited]', '[whispering]', '[pause]', '[nervous]', '[crying]'],
+  scriptTemplates: [
+    { label: 'Pidgin Broadcast', text: 'How far my people! [laughing] Make una gather here sharp sharp. Dis new studio voice engine sabi speak better Naija Pidgin well well, everything clean without stress!' },
+    { label: 'Lagos Executive', text: 'Good morning, esteemed colleagues. Today, we present an innovative solution that will transform the African technology landscape and deliver measurable value to our stakeholders.' },
+    { label: 'Documentary', text: 'Across the vast savannahs of East Africa, ancient traditions meet the pulse of modern innovation. This is a story of resilience, culture, and the unbreakable human spirit.' },
+  ],
+  timbreOptions: ['Male', 'Female', 'Auto / Match'],
+  speedMin: 0.5,
+  speedMax: 2.0,
+  speedDefault: 1.0,
+  maxChars: 3000,
+}
+
+export async function getStudioConfig(): Promise<StudioConfig> {
+  try {
+    const raw = await fetch(`${BASE}/studio-config`)
+    if (!raw.ok) return DEFAULT_STUDIO_CONFIG
+    const data: unknown = await raw.json()
+    if (typeof data === 'object' && data !== null && 'accentOptions' in data) return data as StudioConfig
+    return DEFAULT_STUDIO_CONFIG
+  } catch { return DEFAULT_STUDIO_CONFIG }
+}
+
+export { DEFAULT_STUDIO_CONFIG }
 
 export interface Plan {
   id: 'free' | 'starter' | 'pro' | 'enterprise'
@@ -201,4 +268,13 @@ export interface AdminStats {
 
 export async function adminGetStats(): Promise<AdminStats> {
   return handle(await fetch(`${BASE}/admin/stats`, { headers: headers() }))
+}
+
+export async function adminGetStudioConfig(): Promise<StudioConfig> {
+  try { return handle(await fetch(`${BASE}/admin/studio-config`, { headers: headers() })) }
+  catch { return DEFAULT_STUDIO_CONFIG }
+}
+
+export async function adminPutStudioConfig(cfg: StudioConfig): Promise<void> {
+  return handle(await fetch(`${BASE}/admin/studio-config`, { method: 'PUT', headers: headers(), body: JSON.stringify(cfg) }))
 }
