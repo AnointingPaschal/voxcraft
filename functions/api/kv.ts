@@ -121,7 +121,8 @@ export async function incrementUsage(env: Env, userId: string, chars: number): P
   if (!user) return { allowed: false, remaining: 0, limit: 0, period: 'day' }
   const plans = await getPlans(env)
   const plan = plans.find(p => p.id === user.plan) ?? plans[0]!
-  const period = plan.tokenPeriod ?? 'day'
+  // default: free plan is daily, all paid plans are monthly
+  const period = plan.tokenPeriod ?? (plan.price > 0 ? 'month' : 'day')
   // Key: YYYY-MM-DD for daily, YYYY-MM for monthly
   const now = new Date()
   const periodKey = period === 'month'

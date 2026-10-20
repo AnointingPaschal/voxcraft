@@ -109,7 +109,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     if (!user) return e('Unauthorized', 401)
     const plans = await getPlans(env)
     const plan = plans.find(p => p.id === user.plan) ?? plans[0]!
-    const period = plan.tokenPeriod ?? 'day'
+    const period = plan.tokenPeriod ?? (plan.price > 0 ? 'month' : 'day')
     const now = new Date()
     const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
     const usage = await getUsage(env, user.id, periodKey)
