@@ -780,7 +780,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [voices, setVoices] = useState<VoiceSample[]>([])
   const [selectedVoiceId, setSelectedVoiceId] = useState('')
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
-  const [timbre] = useState<Timbre>('Auto / Match')
+  const [_timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
   const [pacing] = useState(1.0)
   const [format, setFormat] = useState('mp3')

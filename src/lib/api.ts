@@ -271,6 +271,30 @@ export async function adminGetStats(): Promise<AdminStats> {
   return handle(await fetch(`${BASE}/admin/stats`, { headers: headers() }))
 }
 
+// ── Voices ────────────────────────────────────────────────────────────────────
+export interface VoiceProfile {
+  id: string; name: string; accent: string
+  gender: 'male' | 'female' | 'neutral'
+  description: string; tags: string[]; sampleUrl: string
+  previewTranscript?: string; createdAt: number
+}
+
+export async function getVoices(): Promise<VoiceProfile[]> {
+  return handle(await fetch(`${BASE}/voices`))
+}
+
+export async function adminGetVoices(): Promise<VoiceProfile[]> {
+  return handle(await fetch(`${BASE}/admin/voices`, { headers: headers() }))
+}
+
+export async function adminCreateVoice(data: Partial<VoiceProfile> & { sampleDataUrl?: string }): Promise<VoiceProfile> {
+  return handle(await fetch(`${BASE}/admin/voices`, { method: 'POST', headers: headers(), body: JSON.stringify(data) }))
+}
+
+export async function adminDeleteVoice(id: string): Promise<void> {
+  return handle(await fetch(`${BASE}/admin/voices/${id}`, { method: 'DELETE', headers: headers() }))
+}
+
 export async function adminGetStudioConfig(): Promise<StudioConfig> {
   try { return handle(await fetch(`${BASE}/admin/studio-config`, { headers: headers() })) }
   catch { return DEFAULT_STUDIO_CONFIG }

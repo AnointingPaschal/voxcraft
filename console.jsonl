@@ -237,3 +237,29 @@
 {"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792186823623}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792186823625}
 {"level":"debug","message":"[vite] connected.","timestamp":1792186829462}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792502220024}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792502220025}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792502222892}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792502222893}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/AuthPage.tsx","timestamp":1792502248063}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792502248064}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/PlansPage.tsx","timestamp":1792502248984}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792502248985}
+{"level":"debug","message":"(previous line repeated 2× more)","timestamp":1792502253301}
+{"level":"debug","message":"[vite] hot updated: /src/hooks/useAuth.tsx","timestamp":1792502253301}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792502253302}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/PlansPage.tsx","timestamp":1792502253303}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792502253303}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/SetupWizard.tsx","timestamp":1792502253304}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/AuthPage.tsx","timestamp":1792502253306}
+{"level":"debug","message":"[vite] connected.","timestamp":1792502287148}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792502368150}
+{"level":"debug","message":"[vite] connected.","timestamp":1792502406913}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792502481331}
+{"level":"debug","message":"[vite] invalidate /src/hooks/useAuth.tsx: Could not Fast Refresh (\"useAuth\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1792502481335}
+{"level":"debug","message":"[vite] hot updated: /src/hooks/useAuth.tsx","timestamp":1792502481335}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792502481336}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/PlansPage.tsx","timestamp":1792502481337}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792502481338}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/SetupWizard.tsx","timestamp":1792502481339}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/AuthPage.tsx","timestamp":1792502481341}
