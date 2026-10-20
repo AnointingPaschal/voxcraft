@@ -939,7 +939,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       {user && usage && (
         <div className="rounded-2xl px-4 py-3 studio-usage-bar">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium studio-usage-label">Daily Usage</span>
+            <span className="text-xs font-medium studio-usage-label">{usage?.period === 'month' ? 'Monthly Usage' : 'Daily Usage'}</span>
             <div className="flex items-center gap-2">
               <span className="text-xs tabular-nums studio-usage-count">{usage.tokensUsed.toLocaleString()} / {usage.limit.toLocaleString()} chars</span>
               <button type="button" onClick={onPlans} className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1 studio-upgrade-btn">

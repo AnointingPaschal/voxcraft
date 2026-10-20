@@ -107,11 +107,13 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
   if (path === '/api/usage' && req.method === 'GET') {
     const user = await requireAuth(env, req)
     if (!user) return e('Unauthorized', 401)
-    const today = new Date().toISOString().slice(0, 10)
-    const usage = await getUsage(env, user.id, today)
     const plans = await getPlans(env)
-    const plan = plans.find(p => p.id === user.plan) ?? plans[0]
-    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan })
+    const plan = plans.find(p => p.id === user.plan) ?? plans[0]!
+    const period = plan.tokenPeriod ?? 'day'
+    const now = new Date()
+    const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
+    const usage = await getUsage(env, user.id, periodKey)
+    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period })
   }
 
   // ── TTS Synthesize ────────────────────────────────────────────────────────
@@ -171,7 +173,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
 
     const ab = await upstream.arrayBuffer()
     const mime = format === 'wav' ? 'audio/wav' : 'audio/mpeg'
-    return new Response(ab, { headers: { 'Content-Type': mime, 'Content-Length': String(ab.byteLength), 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining) } })
+    return new Response(ab, { headers: { 'Content-Type': mime, 'Content-Length': String(ab.byteLength), 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining), 'X-Tokens-Limit': String(quota.limit), 'X-Tokens-Period': quota.period } })
   }
 
   // ── Payment ───────────────────────────────────────────────────────────────

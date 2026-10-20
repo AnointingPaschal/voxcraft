@@ -116,20 +116,26 @@ export async function getUsage(env: Env, userId: string, date: string): Promise<
   return rec ?? { userId, date, tokensUsed: 0, lastUpdated: Date.now() }
 }
 
-export async function incrementUsage(env: Env, userId: string, chars: number): Promise<{ allowed: boolean; remaining: number; limit: number }> {
+export async function incrementUsage(env: Env, userId: string, chars: number): Promise<{ allowed: boolean; remaining: number; limit: number; period: 'day' | 'month' }> {
   const user = await getUser(env, userId)
-  if (!user) return { allowed: false, remaining: 0, limit: 0 }
+  if (!user) return { allowed: false, remaining: 0, limit: 0, period: 'day' }
   const plans = await getPlans(env)
-  const plan = plans.find(p => p.id === user.plan) ?? plans[0]
-  const today = new Date().toISOString().slice(0, 10)
-  const usage = await getUsage(env, userId, today)
+  const plan = plans.find(p => p.id === user.plan) ?? plans[0]!
+  const period = plan.tokenPeriod ?? 'day'
+  // Key: YYYY-MM-DD for daily, YYYY-MM for monthly
+  const now = new Date()
+  const periodKey = period === 'month'
+    ? now.toISOString().slice(0, 7)       // e.g. "2026-10"
+    : now.toISOString().slice(0, 10)      // e.g. "2026-10-20"
+  const ttl = period === 'month' ? 86400 * 35 : 86400 * 2
+  const usage = await getUsage(env, userId, periodKey)
   if (usage.tokensUsed + chars > plan.tokensPerDay) {
-    return { allowed: false, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), limit: plan.tokensPerDay }
+    return { allowed: false, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), limit: plan.tokensPerDay, period }
   }
   usage.tokensUsed += chars
   usage.lastUpdated = Date.now()
-  await env.KV.put(keys.usage(userId, today), JSON.stringify(usage), { expirationTtl: 86400 * 2 })
-  return { allowed: true, remaining: plan.tokensPerDay - usage.tokensUsed, limit: plan.tokensPerDay }
+  await env.KV.put(keys.usage(userId, periodKey), JSON.stringify(usage), { expirationTtl: ttl })
+  return { allowed: true, remaining: plan.tokensPerDay - usage.tokensUsed, limit: plan.tokensPerDay, period }
 }
 
 // ── Payments ──────────────────────────────────────────────────────────────────

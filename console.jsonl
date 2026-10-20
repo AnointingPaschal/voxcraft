@@ -263,3 +263,6 @@
 {"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792502481338}
 {"level":"debug","message":"[vite] hot updated: /src/components/auth/SetupWizard.tsx","timestamp":1792502481339}
 {"level":"debug","message":"[vite] hot updated: /src/components/auth/AuthPage.tsx","timestamp":1792502481341}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792503468109}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792503468113}
+{"level":"debug","message":"[vite] connected.","timestamp":1792503479369}

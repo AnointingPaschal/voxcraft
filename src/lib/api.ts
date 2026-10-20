@@ -172,6 +172,7 @@ export interface UsageData {
   limit: number
   remaining: number
   plan: string
+  period: 'day' | 'month'
 }
 
 export async function getUsage(): Promise<UsageData> {

@@ -35,6 +35,7 @@ export interface Plan {
   price: number
   priceNgn?: number
   tokensPerDay: number
+  tokenPeriod?: 'day' | 'month'
   features: string[]
   popular?: boolean
   flwPlanId?: string
