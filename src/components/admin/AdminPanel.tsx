@@ -538,6 +538,23 @@ function PlansTab() {
                         </button>
                       </Field>
                     </div>
+                    {/* ── History retention ─────────────────────────── */}
+                    <div className="mt-1">
+                      <Field label="History Retention (days — 0 = disabled)">
+                        <div className="flex items-center gap-3">
+                          <AInput
+                            value={String(plan.historyRetentionDays ?? 0)}
+                            type="number"
+                            onChange={v => update(plan.id, { historyRetentionDays: Math.max(0, Number(v)) })}
+                          />
+                          <span className="text-xs adm-muted whitespace-nowrap">
+                            {(plan.historyRetentionDays ?? 0) === 0
+                              ? 'History disabled'
+                              : `Keeps audio for ${plan.historyRetentionDays} day${(plan.historyRetentionDays ?? 0) === 1 ? '' : 's'}`}
+                          </span>
+                        </div>
+                      </Field>
+                    </div>
                     {/* ── Feature flags ──────────────────────────────── */}
                     <div className="mt-2">
                       <div className="text-xs font-semibold adm-muted mb-3 uppercase tracking-wider flex items-center gap-2">

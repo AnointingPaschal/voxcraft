@@ -153,8 +153,31 @@ export interface Plan {
   tokenPeriod?: 'day' | 'month'
   features: string[]
   enabledFeatures?: FeatureId[]
+  historyRetentionDays?: number
   popular?: boolean
   flwPlanId?: string
+}
+
+export interface AudioHistoryItem {
+  id: string
+  createdAt: number
+  expiresAt: number
+  script: string
+  accent: string
+  format: string
+  chars: number
+}
+
+export async function getHistory(): Promise<AudioHistoryItem[]> {
+  return handle(await fetch(`${BASE}/history`, { headers: headers() }))
+}
+
+export async function deleteHistoryItem(id: string): Promise<void> {
+  await fetch(`${BASE}/history/${id}`, { method: 'DELETE', headers: headers() })
+}
+
+export function getHistoryAudioUrl(id: string): string {
+  return `${BASE}/history/${id}`
 }
 
 export async function getPublicConfig(): Promise<SiteConfig> {
@@ -223,6 +246,7 @@ export interface UsageData {
   plan: string
   period: 'day' | 'month'
   enabledFeatures: FeatureId[]
+  historyRetentionDays: number
 }
 
 export async function getUsage(): Promise<UsageData> {

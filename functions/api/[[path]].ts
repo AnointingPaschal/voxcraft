@@ -1,6 +1,6 @@
 import type { Env, User, Plan } from './types'
 import { registerEmail, loginEmail, getGoogleAuthUrl, handleGoogleCallback, requireAuth, requireAdmin, sanitize } from './auth'
-import { getSiteConfig, putSiteConfig, getPlans, putPlans, getUser, putUser, listUsers, incrementUsage, getUsage, getVoiceSamples, putVoiceSamples } from './kv'
+import { getSiteConfig, putSiteConfig, getPlans, putPlans, getUser, putUser, listUsers, incrementUsage, getUsage, getVoiceSamples, putVoiceSamples, saveHistoryEntry, getHistoryIndex, getHistoryEntry, deleteHistoryEntry } from './kv'
 import { ACCENT_KEY_TO_FEATURE } from './types'
 import { initializePayment, verifyAndActivate, handleWebhook } from './flutterwave'
 
@@ -114,7 +114,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const now = new Date()
     const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
     const usage = await getUsage(env, user.id, periodKey)
-    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [] })
+    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0 })
   }
 
   // ── TTS Synthesize ────────────────────────────────────────────────────────
@@ -200,7 +200,64 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
 
     const ab = await upstream.arrayBuffer()
     const mime = format === 'wav' ? 'audio/wav' : 'audio/mpeg'
+
+    // ── Save to history if plan has it enabled ──────────────────────────────
+    const retentionDays = userPlan.historyRetentionDays ?? 0
+    if (hasFx('history') && retentionDays > 0) {
+      try {
+        const bytes = new Uint8Array(ab)
+        const b64 = btoa(String.fromCharCode(...bytes))
+        const dataUrl = `data:${mime};base64,${b64}`
+        const entryId = crypto.randomUUID()
+        const now = Date.now()
+        await saveHistoryEntry(env, {
+          id: entryId,
+          userId: user.id,
+          createdAt: now,
+          expiresAt: now + retentionDays * 86400_000,
+          script: text.trim().slice(0, 200),
+          accent: accentInstruction ?? '',
+          format: (format as 'mp3' | 'wav'),
+          chars: charCount,
+          audioDataUrl: dataUrl,
+          planId: user.plan,
+        }, retentionDays)
+      } catch (histErr) {
+        // History save failure must never block audio delivery
+        console.error('[Voicera] History save failed:', histErr)
+      }
+    }
+
     return new Response(ab, { headers: { 'Content-Type': mime, 'Content-Length': String(ab.byteLength), 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining), 'X-Tokens-Limit': String(quota.limit), 'X-Tokens-Period': quota.period } })
+  }
+
+  // ── Audio History ─────────────────────────────────────────────────────────
+  if (path === '/api/history' && req.method === 'GET') {
+    const user = await requireAuth(env, req)
+    if (!user) return e('Unauthorized', 401)
+    const idx = await getHistoryIndex(env, user.id)
+    return json(idx)
+  }
+
+  if (path.startsWith('/api/history/') && req.method === 'GET') {
+    const user = await requireAuth(env, req)
+    if (!user) return e('Unauthorized', 401)
+    const id = path.replace('/api/history/', '')
+    const entry = await getHistoryEntry(env, user.id, id)
+    if (!entry) return e('Not found', 404)
+    // Return the audio as a binary response
+    const b64 = entry.audioDataUrl.split(',')[1] ?? ''
+    const binary = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    const mime = entry.format === 'wav' ? 'audio/wav' : 'audio/mpeg'
+    return new Response(binary.buffer, { headers: { 'Content-Type': mime, 'Content-Disposition': `attachment; filename="voicera-${id}.${entry.format}"`, 'Cache-Control': 'private, max-age=3600' } })
+  }
+
+  if (path.startsWith('/api/history/') && req.method === 'DELETE') {
+    const user = await requireAuth(env, req)
+    if (!user) return e('Unauthorized', 401)
+    const id = path.replace('/api/history/', '')
+    await deleteHistoryEntry(env, user.id, id)
+    return json({ ok: true })
   }
 
   // ── Payment ───────────────────────────────────────────────────────────────

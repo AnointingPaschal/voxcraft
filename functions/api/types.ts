@@ -75,10 +75,24 @@ export interface Plan {
   priceNgn?: number
   tokensPerDay: number
   tokenPeriod?: 'day' | 'month'
-  features: string[]          // display text lines (kept for Pricing page)
-  enabledFeatures?: FeatureId[] // functional feature flags
+  features: string[]
+  enabledFeatures?: FeatureId[]
+  historyRetentionDays?: number  // 0 = no history; >0 = days to keep audio
   popular?: boolean
   flwPlanId?: string
+}
+
+export interface AudioHistoryEntry {
+  id: string            // uuid
+  userId: string
+  createdAt: number     // unix ms
+  expiresAt: number     // unix ms — when KV auto-expires the entry
+  script: string        // first 200 chars of the script
+  accent: string
+  format: 'mp3' | 'wav'
+  chars: number
+  audioDataUrl: string  // base64 data URL of the audio blob (stored in KV)
+  planId: string
 }
 
 export interface ThemePalette { background: string; surface: string; text: string; muted: string; border: string; accent: string }

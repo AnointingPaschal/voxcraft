@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mic, Upload, FileText, Wand2, Play, Download, Loader2, MessageSquareText,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
-  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu, Lock,
+  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu, Lock, History,
   Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,6 +13,7 @@ import { synthesize, getUsage, getVoiceSamples, getPublicConfig, getStudioConfig
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
+import HistoryPage from './components/dashboard/HistoryPage'
 import SetupWizard from './components/auth/SetupWizard'
 import ThemeToggle from './components/ThemeToggle'
 
@@ -31,7 +32,7 @@ const SYNTHESIS_STAGES = [
   { label: 'Mastering', desc: 'Mastering audio for studio quality…' },
 ]
 
-type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin' | 'contact'
+type Page = 'home' | 'studio' | 'auth' | 'plans' | 'admin' | 'contact' | 'history'
 
 function pathToPage(pathname: string): Page | null {
   if (pathname === '/studio') return 'studio'
@@ -39,6 +40,7 @@ function pathToPage(pathname: string): Page | null {
   if (pathname === '/plans' || pathname === '/pricing') return 'plans'
   if (pathname === '/contact') return 'contact'
   if (pathname === '/admin') return 'admin'
+  if (pathname === '/history') return 'history'
   return null
 }
 
@@ -134,6 +136,7 @@ export default function App(): JSX.Element {
   const [workerDown, setWorkerDown] = useState(false)
   const [kvMissing, setKvMissing] = useState(false)
   const [siteConfig, setSiteConfig] = useState<SiteConfig | null>(null)
+  const [appUsage, setAppUsage] = useState<import('./lib/api').UsageData | null>(null)
   const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('vc_theme') as 'light' | 'dark') || 'light')
 
   // Sync theme attribute + fire event
@@ -181,6 +184,8 @@ export default function App(): JSX.Element {
   }, [])
 
   useEffect(() => { getPublicConfig().then(setSiteConfig).catch(() => undefined) }, [])
+  useEffect(() => { if (user) getUsage().then(setAppUsage).catch(() => null) }, [user])
+  const appHasFeat = (id: string) => (appUsage?.enabledFeatures ?? []).includes(id as never)
 
   // Check setup status once on mount
   useEffect(() => {
@@ -253,6 +258,20 @@ export default function App(): JSX.Element {
   }
 
   if (page === 'auth') return <AuthPage onSuccess={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} />
+  if (page === 'history') {
+    if (!user) { setPage('auth'); return <></> }
+    return (
+      <PageShell>
+        <StudioHeader allowThemeToggle={siteConfig?.allowThemeToggle ?? true} user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} onHistory={() => setPage('history')} />
+        <HistoryPage
+          onPlans={() => setPage('plans')}
+          hasHistory={appHasFeat('history')}
+          retentionDays={appUsage?.historyRetentionDays ?? 0}
+        />
+      </PageShell>
+    )
+  }
+
   if (page === 'plans') return (
     <PageShell>
       <PlansPage onBack={() => setPage('studio')} allowThemeToggle={siteConfig?.allowThemeToggle ?? true} siteConfig={siteConfig} onNavigate={setPage} user={user} onSignIn={() => setPage('auth')} onStudio={() => setPage('studio')} />
@@ -260,7 +279,7 @@ export default function App(): JSX.Element {
   )
   if (page === 'studio') return (
     <PageShell>
-      <StudioHeader allowThemeToggle={siteConfig?.allowThemeToggle ?? true} user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} />
+      <StudioHeader allowThemeToggle={siteConfig?.allowThemeToggle ?? true} user={user} onLogout={() => { logout(); setPage('home') }} onPlans={() => setPage('plans')} onAdmin={() => setPage('admin')} onHistory={() => setPage('history')} />
       <StudioBody user={user} onSignIn={() => setPage('auth')} onPlans={() => setPage('plans')} studioConfig={null} />
     </PageShell>
   )
@@ -678,12 +697,13 @@ function ContactPage({ siteConfig, onNavigate }: { siteConfig: SiteConfig | null
 }
 
 // ── Studio Header ─────────────────────────────────────────────────────────────
-function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = true }: {
+function StudioHeader({ user, onLogout, onPlans, onAdmin, onHistory, allowThemeToggle = true }: {
   allowThemeToggle?: boolean
   user: ReturnType<typeof useAuth>['user']
   onLogout: () => void
   onPlans: () => void
   onAdmin: () => void
+  onHistory: () => void
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
@@ -730,6 +750,7 @@ function StudioHeader({ user, onLogout, onPlans, onAdmin, allowThemeToggle = tru
                     </div>
                   </div>
                   <MenuItem icon={<Crown size={13} />} label="Upgrade Plan" onClick={() => { setMenuOpen(false); onPlans() }} />
+                  <MenuItem icon={<History size={13} />} label="Audio History" onClick={() => { setMenuOpen(false); onHistory() }} />
                   {user.role === 'admin' && (
                     <MenuItem icon={<ShieldCheck size={13} />} label="Admin Panel" onClick={() => { setMenuOpen(false); onAdmin() }} />
                   )}
@@ -777,7 +798,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
   const [accent, setAccent] = useState(() => sc.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
   const [voices, setVoices] = useState<VoiceSample[]>([])
-  const [selectedVoiceId, setSelectedVoiceId] = useState('')
+  const [_selectedVoiceId, setSelectedVoiceId] = useState('')
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [_timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
