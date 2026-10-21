@@ -1169,3 +1169,31 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
 .adm-btn-ghost:hover {
   background: var(--site-border, rgba(0,0,0,.06));
 }
+
+/* ── Feature flag checkboxes ─────────────────────────────────────────────── */
+.adm-feature-on {
+  background: rgba(16,185,129,.08);
+  border-color: rgba(16,185,129,.35);
+}
+.adm-feature-off {
+  background: transparent;
+  border-color: var(--site-border, rgba(0,0,0,.1));
+}
+.adm-feature-check-off {
+  background: var(--site-border, rgba(0,0,0,.08));
+}
+.adm-accent-text { color: var(--site-accent, #10b981); }
+
+/* ── Feature gate banners in studio ─────────────────────────────────────── */
+.studio-gate-banner {
+  background: rgba(234,179,8,.08);
+  border: 1px solid rgba(234,179,8,.25);
+  color: var(--site-text, #1a1a1a);
+}
+[data-theme="dark"] .studio-gate-banner {
+  color: #fde68a;
+}
+.studio-gate-upgrade {
+  color: #d97706;
+  text-decoration: underline;
+}

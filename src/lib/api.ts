@@ -149,9 +149,12 @@ export interface Plan {
   price: number
   priceNgn?: number
   tokensPerDay: number
-  tokenBillingMode?: 'day' | 'month'   // default 'day' when absent
+  tokenBillingMode?: 'day' | 'month'
+  tokenPeriod?: 'day' | 'month'
   features: string[]
+  enabledFeatures?: FeatureId[]
   popular?: boolean
+  flwPlanId?: string
 }
 
 export async function getPublicConfig(): Promise<SiteConfig> {
@@ -167,12 +170,33 @@ export async function getPlans(): Promise<Plan[]> {
 }
 
 // ── Usage ─────────────────────────────────────────────────────────────────────
+export const PLATFORM_FEATURES = [
+  { id: 'accent_all',        category: 'Accents',        label: 'All Accents (10+)',              description: 'Unlock all regional accents' },
+  { id: 'accent_african',    category: 'Accents',        label: 'African Accents Only',            description: 'Nigerian, Ghanaian, Kenyan, S.African' },
+  { id: 'format_mp3',        category: 'Output Format',  label: 'MP3 Export',                     description: 'Standard compressed audio' },
+  { id: 'format_wav',        category: 'Output Format',  label: 'WAV Export',                     description: 'Lossless studio-quality audio' },
+  { id: 'voice_clone',       category: 'Voice Cloning',  label: 'Voice Print Cloning',            description: 'Upload reference audio to clone a voice' },
+  { id: 'voice_library',     category: 'Voice Cloning',  label: 'Voice Library Selection',        description: 'Pick from admin-curated voice samples' },
+  { id: 'vocal_cues',        category: 'Script Editor',  label: 'Vocal Cue Insertion',            description: '[laughing], [pause], [whispering] etc.' },
+  { id: 'script_templates',  category: 'Script Editor',  label: 'Script Templates',               description: 'Pidgin Broadcast, Documentary, Executive' },
+  { id: 'perf_style',        category: 'Performance',    label: 'Performance Style Picker',       description: 'Conversational, Dramatic, Newscaster etc.' },
+  { id: 'pacing_control',    category: 'Performance',    label: 'Pacing / Speed Control',         description: 'Adjust speech rate 0.5×–2×' },
+  { id: 'priority_queue',    category: 'Quality',        label: 'Priority Processing Queue',      description: 'Jobs processed first' },
+  { id: 'batch_synthesis',   category: 'Quality',        label: 'Batch Synthesis',                description: 'Submit multiple scripts at once' },
+  { id: 'download_audio',    category: 'Downloads',      label: 'Audio Download',                 description: 'Download the generated MP3/WAV file' },
+  { id: 'history',           category: 'Downloads',      label: 'Generation History',             description: 'Access past synthesized audio files' },
+  { id: 'api_access',        category: 'API',            label: 'API Access',                     description: 'Programmatic access via REST API' },
+] as const
+
+export type FeatureId = typeof PLATFORM_FEATURES[number]['id']
+
 export interface UsageData {
   tokensUsed: number
   limit: number
   remaining: number
   plan: string
   period: 'day' | 'month'
+  enabledFeatures: FeatureId[]
 }
 
 export async function getUsage(): Promise<UsageData> {

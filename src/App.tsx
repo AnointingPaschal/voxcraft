@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Mic, Upload, FileText, Wand2, Play, Download, Loader2, MessageSquareText,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
-  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu,
+  Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu, Lock,
   Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -822,6 +822,9 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     getUsage().then(setUsage).catch(() => null)
   }, [user])
 
+  // Feature gate helper — returns true when the user's plan has the feature enabled
+  const hasFeat = (id: string) => (usage?.enabledFeatures ?? []).includes(id as never)
+
   const startProgressTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => {
@@ -971,20 +974,38 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           }
         }} options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
 
-        <FieldLabel>Performance Style</FieldLabel>
-        <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
+        {hasFeat('perf_style') ? (
+          <>
+            <FieldLabel>Performance Style</FieldLabel>
+            <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
+          </>
+        ) : null}
 
         <div className="flex items-end gap-4">
           <div className="w-48">
             <FieldLabel>Master Format</FieldLabel>
-            <SelectField value={format} onChange={setFormat} options={FORMAT_OPTIONS} />
+            <SelectField value={format} onChange={setFormat}
+              options={FORMAT_OPTIONS.filter(o => o.value === 'mp3' || hasFeat('format_wav'))} />
           </div>
+          {!hasFeat('format_wav') && (
+            <button type="button" onClick={onPlans}
+              className="text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all studio-upgrade-btn mb-0.5">
+              <Lock size={10} /> WAV — Upgrade
+            </button>
+          )}
         </div>
       </Section>
 
       {/* Sample voices section removed — accent selection silently clones the matching voice */}
 
       <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
+        {!hasFeat('voice_clone') && (
+          <div className="rounded-xl p-3 mb-3 flex items-center gap-2 text-xs studio-gate-banner">
+            <Lock size={12} />
+            <span>Voice cloning is available on Starter and higher plans.</span>
+            <button type="button" onClick={onPlans} className="ml-auto font-semibold studio-gate-upgrade">Upgrade</button>
+          </div>
+        )}
         <p className="text-xs leading-relaxed studio-section-hint">
           Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker's vocal identity.
         </p>
@@ -1010,15 +1031,16 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
         <div className="flex gap-2">
           <button type="button"
-            onClick={() => { if (isRecording) stopRecording(); else void startRecording() }}
-            className={`flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-all studio-record-btn${isRecording ? ' recording' : ''}`}>
-            <Mic size={15} />
+            disabled={!hasFeat('voice_clone')}
+            onClick={() => { if (!hasFeat('voice_clone')) { onPlans(); return } if (isRecording) stopRecording(); else void startRecording() }}
+            className={`flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-all studio-record-btn${isRecording ? ' recording' : ''}${!hasFeat('voice_clone') ? ' opacity-50 cursor-not-allowed' : ''}`}>
+            {!hasFeat('voice_clone') ? <Lock size={15} /> : <Mic size={15} />}
             {isRecording ? 'Stop Recording' : 'Record Microphone'}
           </button>
-          <label className="flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 cursor-pointer transition-all studio-upload-btn">
-            <Upload size={15} />
+          <label className={`flex-1 rounded-xl py-3 text-sm font-semibold flex items-center justify-center gap-2 transition-all studio-upload-btn${!hasFeat('voice_clone') ? ' opacity-50 cursor-not-allowed' : ' cursor-pointer'}`}>
+            {!hasFeat('voice_clone') ? <Lock size={15} /> : <Upload size={15} />}
             Import Audio Clip
-            <input type="file" accept="audio/*" className="hidden" onChange={e => { if (e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
+            <input type="file" accept="audio/*" className="hidden" disabled={!hasFeat('voice_clone')} onChange={e => { if (hasFeat('voice_clone') && e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
           </label>
         </div>
       </Section>

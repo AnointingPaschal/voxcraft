@@ -14,7 +14,8 @@ import {
   adminGetConfig, adminPatchConfig, adminGetPlans, adminPutPlans,
   adminGetUsers, adminPatchUser, adminGetStats,
   adminGetStudioConfig, adminPutStudioConfig, synthesize,
-  type FullSiteConfig, type Plan, type AuthUser, type AdminStats,
+  PLATFORM_FEATURES,
+  type FeatureId, type FullSiteConfig, type Plan, type AuthUser, type AdminStats,
   type VoiceSample, type StudioConfig, adminGetVoiceSamples, adminPutVoiceSamples,
   DEFAULT_STUDIO_CONFIG,
 } from '../../lib/api'
@@ -537,14 +538,50 @@ function PlansTab() {
                         </button>
                       </Field>
                     </div>
-                    <Field label="Features (one per line)">
-                      <textarea
-                        value={plan.features.join('\n')}
-                        onChange={e => update(plan.id, { features: e.target.value.split('\n').filter(Boolean) })}
-                        rows={4}
-                        className="adm-textarea w-full rounded-xl px-3 py-2.5 text-xs outline-none resize-none"
-                      />
-                    </Field>
+                    {/* ── Feature flags ──────────────────────────────── */}
+                    <div className="mt-2">
+                      <div className="text-xs font-semibold adm-muted mb-3 uppercase tracking-wider flex items-center gap-2">
+                        <Zap size={12} className="adm-accent-text" />
+                        Platform Features
+                      </div>
+                      {(() => {
+                        const enabled = new Set<string>(plan.enabledFeatures ?? [])
+                        const toggleFx = (id: FeatureId) => {
+                          const next = enabled.has(id)
+                            ? (plan.enabledFeatures ?? []).filter(f => f !== id)
+                            : [...(plan.enabledFeatures ?? []), id]
+                          update(plan.id, { enabledFeatures: next })
+                        }
+                        const categories = [...new Set(PLATFORM_FEATURES.map(f => f.category))]
+                        return (
+                          <div className="space-y-4">
+                            {categories.map(cat => (
+                              <div key={cat}>
+                                <div className="text-[10px] font-bold adm-muted uppercase tracking-widest mb-2">{cat}</div>
+                                <div className="grid grid-cols-1 gap-1.5">
+                                  {PLATFORM_FEATURES.filter(f => f.category === cat).map(f => {
+                                    const on = enabled.has(f.id)
+                                    return (
+                                      <label key={f.id}
+                                        className={`flex items-start gap-3 rounded-xl p-2.5 cursor-pointer transition-all border ${on ? 'adm-feature-on' : 'adm-feature-off'}`}
+                                        onClick={() => toggleFx(f.id)}>
+                                        <span className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded flex items-center justify-center transition-all ${on ? 'bg-emerald-500' : 'adm-feature-check-off'}`}>
+                                          {on && <CheckCircle2 size={12} className="text-white" />}
+                                        </span>
+                                        <span className="flex-1 min-w-0">
+                                          <span className={`block text-xs font-semibold ${on ? 'adm-text' : 'adm-muted'}`}>{f.label}</span>
+                                          <span className="block text-[10px] adm-muted mt-0.5">{f.description}</span>
+                                        </span>
+                                      </label>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
                   </div>
                 </motion.div>
               )}

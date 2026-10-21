@@ -113,7 +113,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const now = new Date()
     const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
     const usage = await getUsage(env, user.id, periodKey)
-    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period })
+    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [] })
   }
 
   // ── TTS Synthesize ────────────────────────────────────────────────────────
@@ -125,10 +125,26 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript } = body
     if (!text?.trim()) return e('Please enter a script to synthesize.')
 
+    // ── Feature gate checks ──────────────────────────────────────────────────
+    const plans = await getPlans(env)
+    const userPlan = plans.find(p => p.id === user.plan) ?? plans[0]!
+    const fx = userPlan.enabledFeatures ?? []
+    const hasFx = (id: string) => fx.includes(id as never)
+
+    // WAV format gate
+    if (format === 'wav' && !hasFx('format_wav')) {
+      return e('WAV export is not available on your plan. Upgrade to Starter or higher.', 403)
+    }
+    // Voice cloning gate
+    if (referenceAudioDataUrl && !hasFx('voice_clone')) {
+      return e('Voice Print Cloning is not available on your plan. Upgrade to Starter or higher.', 403)
+    }
+
     const charCount = text.trim().length
     const quota = await incrementUsage(env, user.id, charCount)
     if (!quota.allowed) {
-      return json({ error: `Daily limit reached. ${quota.remaining} chars remaining. Upgrade to continue.`, limitReached: true, remaining: quota.remaining, limit: quota.limit }, 429)
+      const periodLabel = quota.period === 'month' ? 'Monthly' : 'Daily'
+      return json({ error: `${periodLabel} limit reached. ${quota.remaining.toLocaleString()} chars remaining. Upgrade to continue.`, limitReached: true, remaining: quota.remaining, limit: quota.limit }, 429)
     }
 
     const config = await getSiteConfig(env)
