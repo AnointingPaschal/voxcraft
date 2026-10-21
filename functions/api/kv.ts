@@ -1,4 +1,4 @@
-import type { Env, User, SiteConfig, Plan, UsageRecord, PaymentRecord, VoiceSample } from './types'
+import type { Env, User, SiteConfig, Plan, UsageRecord, PaymentRecord, VoiceSample, FeatureId } from './types'
 
 // ── Key helpers ──────────────────────────────────────────────────────────────
 export const keys = {
@@ -94,19 +94,25 @@ export async function listUsers(env: Env): Promise<User[]> {
 }
 
 // ── Plans ─────────────────────────────────────────────────────────────────────
+const ALL_ACCENTS: FeatureId[] = [
+  'accent_nigerian_pidgin', 'accent_nigerian_std', 'accent_lagos_exec',
+  'accent_ghanaian', 'accent_kenyan', 'accent_south_african',
+  'accent_jamaican', 'accent_british', 'accent_american', 'accent_middle_eastern',
+]
+
 const DEFAULT_PLANS: Plan[] = [
   { id: 'free', name: 'Free', price: 0, priceNgn: 0, tokensPerDay: 500, tokenPeriod: 'day',
     features: ['500 chars/day', '3 accents', 'MP3 only', 'Basic quality'],
-    enabledFeatures: ['accent_african', 'format_mp3', 'download_audio'] },
+    enabledFeatures: ['accent_nigerian_pidgin', 'accent_nigerian_std', 'accent_lagos_exec', 'format_mp3', 'download_audio'] },
   { id: 'starter', name: 'Starter', price: 5, tokensPerDay: 5000, popular: false, tokenPeriod: 'month',
-    features: ['5,000 chars/day', 'All accents', 'MP3 + WAV', 'Voice cloning'],
-    enabledFeatures: ['accent_all', 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'perf_style', 'download_audio', 'vocal_cues'] },
+    features: ['5,000 chars/month', 'All African accents', 'MP3 + WAV', 'Voice cloning'],
+    enabledFeatures: ['accent_nigerian_pidgin', 'accent_nigerian_std', 'accent_lagos_exec', 'accent_ghanaian', 'accent_kenyan', 'accent_south_african', 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'perf_style', 'download_audio', 'vocal_cues'] },
   { id: 'pro', name: 'Pro', price: 15, tokensPerDay: 25000, popular: true, tokenPeriod: 'month',
-    features: ['25,000 chars/day', 'All accents', 'MP3 + WAV', 'Voice cloning', 'Priority queue', 'Vocal cues'],
-    enabledFeatures: ['accent_all', 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'priority_queue', 'download_audio', 'history'] },
+    features: ['25,000 chars/month', 'All accents', 'MP3 + WAV', 'Voice cloning', 'Priority queue', 'Vocal cues'],
+    enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'priority_queue', 'download_audio', 'history'] },
   { id: 'enterprise', name: 'Enterprise', price: 49, tokensPerDay: 200000, popular: false, tokenPeriod: 'month',
-    features: ['200,000 chars/day', 'All accents', 'All formats', 'Unlimited cloning', 'API access', 'Dedicated support'],
-    enabledFeatures: ['accent_all', 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'priority_queue', 'batch_synthesis', 'download_audio', 'history', 'api_access'] },
+    features: ['200,000 chars/month', 'All accents', 'All formats', 'Unlimited cloning', 'API access', 'Dedicated support'],
+    enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'priority_queue', 'batch_synthesis', 'download_audio', 'history', 'api_access'] },
 ]
 
 export async function getPlans(env: Env): Promise<Plan[]> {

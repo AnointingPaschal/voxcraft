@@ -1,6 +1,7 @@
 import type { Env, User, Plan } from './types'
 import { registerEmail, loginEmail, getGoogleAuthUrl, handleGoogleCallback, requireAuth, requireAdmin, sanitize } from './auth'
 import { getSiteConfig, putSiteConfig, getPlans, putPlans, getUser, putUser, listUsers, incrementUsage, getUsage, getVoiceSamples, putVoiceSamples } from './kv'
+import { ACCENT_KEY_TO_FEATURE } from './types'
 import { initializePayment, verifyAndActivate, handleWebhook } from './flutterwave'
 
 // Pages Functions use EventContext — same KV/secrets bindings, different export shape
@@ -133,11 +134,21 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
 
     // WAV format gate
     if (format === 'wav' && !hasFx('format_wav')) {
-      return e('WAV export is not available on your plan. Upgrade to Starter or higher.', 403)
+      return e('WAV export is not available on your plan. Upgrade to unlock WAV.', 403)
     }
     // Voice cloning gate
     if (referenceAudioDataUrl && !hasFx('voice_clone')) {
       return e('Voice Print Cloning is not available on your plan. Upgrade to Starter or higher.', 403)
+    }
+    // Per-accent gate — check the accentInstruction matches an enabled accent
+    if (accentInstruction) {
+      // Find which accent label is being used by matching against ACCENT_FEATURES accentKeys
+      const accentFeatureId = ACCENT_KEY_TO_FEATURE[accentInstruction.split(' ')[0] ?? '']
+        ?? Object.entries(ACCENT_KEY_TO_FEATURE).find(([k]) => accentInstruction.includes(k))?.[1]
+      if (accentFeatureId && !hasFx(accentFeatureId)) {
+        const featureName = accentInstruction.split(' ')[0] ?? 'This accent'
+        return e(`${featureName} is not available on your current plan. Upgrade to access more accents.`, 403)
+      }
     }
 
     const charCount = text.trim().length

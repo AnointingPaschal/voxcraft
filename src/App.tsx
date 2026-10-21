@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, getVoiceSamples, getPublicConfig, getStudioConfig, type UsageData, type VoiceSample, type SiteConfig, type StudioConfig, DEFAULT_STUDIO_CONFIG } from './lib/api'
+import { synthesize, getUsage, getVoiceSamples, getPublicConfig, getStudioConfig, ACCENT_KEY_TO_FEATURE, type UsageData, type VoiceSample, type SiteConfig, type StudioConfig, DEFAULT_STUDIO_CONFIG } from './lib/api'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
@@ -772,7 +772,6 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     }).catch(() => setSc(DEFAULT_STUDIO_CONFIG))
   }, [])
 
-  const ACCENT_OPTIONS = sc.accentOptions
   const PERF_STYLES = sc.perfStyles
   // VOCAL_CUES, SCRIPT_TEMPLATES, TIMBRE_OPTIONS removed from user studio UI
 
@@ -824,6 +823,12 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
   // Feature gate helper — returns true when the user's plan has the feature enabled
   const hasFeat = (id: string) => (usage?.enabledFeatures ?? []).includes(id as never)
+
+  // Filter accents to only those enabled for the user's plan
+  const ACCENT_OPTIONS = sc.accentOptions.filter(a => {
+    const fid = ACCENT_KEY_TO_FEATURE[a.label]
+    return !fid || hasFeat(fid)
+  })
 
   const startProgressTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -958,7 +963,15 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       )}
 
       <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
-        <FieldLabel>Dialect &amp; Accent</FieldLabel>
+        <div className="flex items-center justify-between mb-1">
+          <FieldLabel>Dialect &amp; Accent</FieldLabel>
+          {sc.accentOptions.length > ACCENT_OPTIONS.length && (
+            <button type="button" onClick={onPlans}
+              className="text-xs flex items-center gap-1 studio-gate-upgrade">
+              <Lock size={10} /> {sc.accentOptions.length - ACCENT_OPTIONS.length} locked
+            </button>
+          )}
+        </div>
         <SelectField value={accent.label} onChange={v => {
           const chosen = ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0]
           setAccent(chosen)

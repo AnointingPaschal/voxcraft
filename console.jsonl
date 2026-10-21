@@ -351,3 +351,49 @@
 {"level":"debug","message":"[vite] hot updated: /src/components/auth/AuthPage.tsx","timestamp":1792604433488}
 {"level":"debug","message":"[vite] connected.","timestamp":1792604436892}
 {"level":"debug","message":"[vite] connected.","timestamp":1792604437506}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792604438660}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792604438660}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792604438661}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792604438661}
+{"level":"debug","message":"[vite] connected.","timestamp":1792604473207}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792604627507}
+{"level":"debug","message":"[vite] connected.","timestamp":1792604632526}
+{"level":"debug","message":"[vite] connected.","timestamp":1792604738398}
+{"level":"debug","message":"[vite] connected.","timestamp":1792604906166}
+{"level":"debug","message":"[vite] connected.","timestamp":1792604906934}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792604943777}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792604943809}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792605812141}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792605812150}
+{"level":"debug","message":"[vite] connected.","timestamp":1792605820555}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792605908693}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792605908806}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606001957}
+{"level":"debug","message":"[vite] invalidate /src/hooks/useAuth.tsx: Could not Fast Refresh (\"useAuth\" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports","timestamp":1792606001958}
+{"level":"debug","message":"[vite] hot updated: /src/hooks/useAuth.tsx","timestamp":1792606001959}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606001960}
+{"level":"debug","message":"[vite] hot updated: /src/components/dashboard/PlansPage.tsx","timestamp":1792606001961}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792606001961}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/SetupWizard.tsx","timestamp":1792606001962}
+{"level":"debug","message":"[vite] hot updated: /src/components/auth/AuthPage.tsx","timestamp":1792606001963}
+{"level":"debug","message":"[vite] connected.","timestamp":1792606008119}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606139796}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606139797}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606139871}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606139872}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606150782}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606150782}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606150800}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606150800}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606178370}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606178370}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606178387}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606178387}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606191849}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606191849}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606197860}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606197861}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606230492}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606230492}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792606230512}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792606230514}
