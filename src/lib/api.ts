@@ -186,6 +186,22 @@ export function getHistoryAudioUrl(id: string): string {
   return `${BASE}/history/${id}`
 }
 
+export async function saveHistoryToServer(payload: {
+  audioDataUrl: string
+  script: string
+  accent: string
+  format: string
+  chars: number
+  speed: number
+  pitch: number
+}): Promise<{ id: string }> {
+  return handle(await fetch(`${BASE}/history/save`, {
+    method: 'POST',
+    headers: { ...headers(), 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }))
+}
+
 export async function getPublicConfig(): Promise<SiteConfig> {
   return handle(await fetch(`${BASE}/config`))
 }

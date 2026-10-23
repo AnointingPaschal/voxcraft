@@ -209,37 +209,43 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const ab = await upstream.arrayBuffer()
     const mime = format === 'wav' ? 'audio/wav' : 'audio/mpeg'
 
-    // ── Save to history if plan has it enabled ──────────────────────────────
-    const retentionDays = userPlan.historyRetentionDays ?? 0
-    if (hasFx('history') && retentionDays > 0) {
-      try {
-        const bytes = new Uint8Array(ab)
-        const b64 = btoa(String.fromCharCode(...bytes))
-        const dataUrl = `data:${mime};base64,${b64}`
-        const entryId = crypto.randomUUID()
-        const now = Date.now()
-        await saveHistoryEntry(env, {
-          id: entryId,
-          userId: user.id,
-          createdAt: now,
-          expiresAt: now + retentionDays * 86400_000,
-          script: text.trim().slice(0, 200),
-          accent: accentInstruction ?? '',
-          format: (format as 'mp3' | 'wav'),
-          chars: charCount,
-          audioDataUrl: dataUrl,
-          planId: user.plan,
-        }, retentionDays)
-      } catch (histErr) {
-        // History save failure must never block audio delivery
-        console.error('[Voicera] History save failed:', histErr)
-      }
-    }
+    // History is now saved explicitly by the client after applying speed+pitch
+    // via POST /api/history/save — not auto-saved here.
 
     return new Response(ab, { headers: { 'Content-Type': mime, 'Content-Length': String(ab.byteLength), 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining), 'X-Tokens-Limit': String(quota.limit), 'X-Tokens-Period': quota.period } })
   }
 
   // ── Audio History ─────────────────────────────────────────────────────────
+  // POST /api/history/save — save pre-rendered audio (with speed+pitch already applied)
+  if (path === '/api/history/save' && req.method === 'POST') {
+    const user = await requireAuth(env, req)
+    if (!user) return e('Unauthorized', 401)
+    const userPlan = (await getPlans(env)).find(p => p.id === user.plan) ?? (await getPlans(env))[0]
+    const hasFx = (id: string) => (userPlan.enabledFeatures ?? []).includes(id as never)
+    if (!hasFx('history')) return e('History is not available on your plan.', 403)
+    const retentionDays = userPlan.historyRetentionDays ?? 0
+    if (retentionDays <= 0) return e('History retention is not configured for your plan.', 403)
+
+    const body = await req.json() as { audioDataUrl?: string; script?: string; accent?: string; format?: string; chars?: number; speed?: number; pitch?: number }
+    if (!body.audioDataUrl?.startsWith('data:audio/')) return e('Invalid audio data.', 400)
+
+    const entryId = crypto.randomUUID()
+    const now = Date.now()
+    await saveHistoryEntry(env, {
+      id: entryId,
+      userId: user.id,
+      createdAt: now,
+      expiresAt: now + retentionDays * 86400_000,
+      script: (body.script ?? '').slice(0, 200),
+      accent: body.accent ?? '',
+      format: (body.format === 'wav' ? 'wav' : 'mp3') as 'mp3' | 'wav',
+      chars: body.chars ?? 0,
+      audioDataUrl: body.audioDataUrl,
+      planId: user.plan,
+    }, retentionDays)
+    return json({ ok: true, id: entryId })
+  }
+
   if (path === '/api/history' && req.method === 'GET') {
     const user = await requireAuth(env, req)
     if (!user) return e('Unauthorized', 401)

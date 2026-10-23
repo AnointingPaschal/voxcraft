@@ -2,14 +2,15 @@ import { useState, useRef, useCallback, useEffect, type JSX } from 'react'
 import type React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Mic, Upload, FileText, Wand2, Play, Download, Loader2, MessageSquareText,
+  Mic, Upload, FileText, Wand2, Play, Square, Download, Loader2, MessageSquareText,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
   Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu, Lock, History,
   Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle, Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from './hooks/useAuth'
-import { synthesize, getUsage, getVoiceSamples, getPublicConfig, getStudioConfig, ACCENT_KEY_TO_FEATURE, type UsageData, type VoiceSample, type SiteConfig, type StudioConfig, DEFAULT_STUDIO_CONFIG } from './lib/api'
+import { synthesize, getUsage, getVoiceSamples, getPublicConfig, getStudioConfig, saveHistoryToServer, ACCENT_KEY_TO_FEATURE, type UsageData, type VoiceSample, type SiteConfig, type StudioConfig, DEFAULT_STUDIO_CONFIG } from './lib/api'
+import { decodeBlob, startPreview, renderAudio, blobToDataUrl, type PreviewHandle } from './lib/audioProcessing'
 import AuthPage from './components/auth/AuthPage'
 import AdminPanel from './components/admin/AdminPanel'
 import PlansPage from './components/dashboard/PlansPage'
@@ -817,6 +818,14 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [errorMsg, setErrorMsg] = useState('')
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  // Decoded AudioBuffer of the raw synthesis output (for Web Audio processing)
+  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null)
+  // Track whether the user is previewing with Web Audio
+  const [isPreviewing, setIsPreviewing] = useState(false)
+  const previewHandleRef = useRef<PreviewHandle | null>(null)
+  // Rendering state (when user clicks Save or Download)
+  const [isRendering, setIsRendering] = useState(false)
+  const [isSavingHistory, setIsSavingHistory] = useState(false)
   const [stageIndex, setStageIndex] = useState(0)
   const [stageProgress, setStageProgress] = useState(0)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -951,10 +960,13 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       const url = URL.createObjectURL(blob)
       setAudioUrl(url)
       setAudioBlob(blob)
+      // Decode for Web Audio (speed+pitch preview/render)
+      decodeBlob(blob).then(buf => setAudioBuffer(buf)).catch(() => setAudioBuffer(null))
       stopProgressTimer(true)
       setStatus('success')
+      setIsPreviewing(false)
       setUsage(prev => prev ? { ...prev, tokensUsed: prev.tokensUsed + text.trim().length, remaining } : prev)
-      toast.success('Audio synthesized!')
+      toast.success('Audio synthesized — adjust speed & pitch, then Save or Download.')
     } catch (err) {
       stopProgressTimer(false)
       setStatus('error')
@@ -965,17 +977,100 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, text, scriptMode, format, accent, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
-  // Keep the audio element playback rate in sync with the pacing slider
+  // Stop any running Web Audio preview when speed/pitch changes so the user
+  // can click Preview again to hear the updated settings
+  useEffect(() => {
+    if (isPreviewing) {
+      previewHandleRef.current?.stop()
+      previewHandleRef.current = null
+      setIsPreviewing(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pacing, pitch])
+
+  // Also keep the fallback <audio> element in sync (used when AudioBuffer is null)
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = pacing
   }, [pacing])
 
-  const handleDownload = useCallback(() => {
-    if (!audioBlob) return
-    const url = audioUrl ?? URL.createObjectURL(audioBlob)
-    const a = document.createElement('a')
-    a.href = url; a.download = `voxcraft-output.${format}`; a.click()
-  }, [audioBlob, audioUrl, format])
+  const handlePreview = useCallback(() => {
+    if (!audioBuffer) return
+    previewHandleRef.current?.stop()
+    const handle = startPreview(audioBuffer, pacing, pitch, () => {
+      previewHandleRef.current = null
+      setIsPreviewing(false)
+    })
+    previewHandleRef.current = handle
+    setIsPreviewing(true)
+  }, [audioBuffer, pacing, pitch])
+
+  const handleStopPreview = useCallback(() => {
+    previewHandleRef.current?.stop()
+    previewHandleRef.current = null
+    setIsPreviewing(false)
+  }, [])
+
+  const handleRenderAndDownload = useCallback(async () => {
+    if (!audioBuffer && !audioBlob) return
+    setIsRendering(true)
+    try {
+      let blob: Blob
+      if (audioBuffer && (pacing !== 1.0 || pitch !== 0)) {
+        blob = await renderAudio(audioBuffer, pacing, pitch)
+      } else {
+        blob = audioBlob!
+      }
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `voicera-output-${pacing.toFixed(2)}x-${pitch >= 0 ? '+' : ''}${pitch}st.wav`
+      a.click()
+    } catch {
+      toast.error('Render failed. Try downloading the raw audio.')
+      const a = document.createElement('a')
+      a.href = audioUrl ?? URL.createObjectURL(audioBlob!)
+      a.download = `voicera-output.${format}`
+      a.click()
+    } finally {
+      setIsRendering(false)
+    }
+  }, [audioBuffer, audioBlob, audioUrl, pacing, pitch, format])
+
+  const handleSaveToHistory = useCallback(async () => {
+    if (!audioBuffer && !audioBlob) return
+    if (!hasFeat('history')) { toast.error('History is not available on your plan.'); onPlans(); return }
+    setIsSavingHistory(true)
+    try {
+      let blob: Blob
+      if (audioBuffer && (pacing !== 1.0 || pitch !== 0)) {
+        blob = await renderAudio(audioBuffer, pacing, pitch)
+      } else {
+        blob = audioBlob!
+      }
+      const dataUrl = await blobToDataUrl(blob)
+      await saveHistoryToServer({
+        audioDataUrl: dataUrl,
+        script: text.trim().slice(0, 200),
+        accent: (() => {
+          const parts: string[] = []
+          if (accent?.value?.trim()) parts.push(accent.value.trim())
+          if (perfStyle?.trim()) parts.push(`Style: ${perfStyle.trim()}`)
+          return parts.join(' | ')
+        })(),
+        format: audioBuffer && (pacing !== 1.0 || pitch !== 0) ? 'wav' : format,
+        chars: text.trim().length,
+        speed: pacing,
+        pitch,
+      })
+      toast.success('Saved to history!')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Save failed.')
+    } finally {
+      setIsSavingHistory(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioBuffer, audioBlob, pacing, pitch, text, accent, perfStyle, format, hasFeat, onPlans])
+
+
 
   const charsUsed = text.length
   const limitPct = usage ? Math.min((usage.tokensUsed / usage.limit) * 100, 100) : 0
@@ -1250,27 +1345,63 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         <AnimatePresence>
           {status === 'success' && audioUrl && (
             <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              className="rounded-2xl p-4 studio-audio-card">
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2 size={14} className="studio-check-icon" />
-                <span className="text-sm font-semibold studio-audio-ready">Audio Ready</span>
-              </div>
-              <audio ref={audioRef} src={audioUrl} controls className="w-full mb-3" style={{ borderRadius: 8, height: 36 }}
-                onLoadedMetadata={e => { (e.currentTarget).playbackRate = pacing }} />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => { void audioRef.current?.play() }}
-                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-play-btn">
-                  <Play size={12} /> Play
-                </button>
-                <button type="button" onClick={handleDownload}
-                  className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-download-btn">
-                  <Download size={12} /> Download {format.toUpperCase()}
-                </button>
-                <button type="button" onClick={() => { setStatus('idle'); setAudioUrl(null); setAudioBlob(null) }}
-                  className="rounded-xl px-3 py-2.5 text-xs transition-all studio-close-btn">
+              className="rounded-2xl p-4 studio-audio-card space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="studio-check-icon" />
+                  <span className="text-sm font-semibold studio-audio-ready">Audio Ready</span>
+                </div>
+                <button type="button" onClick={() => {
+                  handleStopPreview()
+                  setStatus('idle'); setAudioUrl(null); setAudioBlob(null); setAudioBuffer(null)
+                }} className="rounded-xl px-2.5 py-1.5 text-xs transition-all studio-close-btn">
                   <X size={13} />
                 </button>
               </div>
+
+              {/* Settings summary */}
+              <div className="flex flex-wrap gap-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+                <span className="studio-badge">{pacing.toFixed(2)}× speed</span>
+                <span className="studio-badge">{pitch === 0 ? '±0 st' : `${pitch > 0 ? '+' : ''}${pitch} st`} pitch</span>
+                <span className="studio-badge">{format.toUpperCase()}</span>
+              </div>
+
+              {/* Fallback audio element — hidden when AudioBuffer is available */}
+              {!audioBuffer && audioUrl && (
+                <audio ref={audioRef} src={audioUrl} controls className="w-full" style={{ borderRadius: 8, height: 36 }}
+                  onLoadedMetadata={e => { (e.currentTarget).playbackRate = pacing }} />
+              )}
+
+              {/* Action row */}
+              <div className="flex gap-2 flex-wrap">
+                {/* Preview — Web Audio with speed+pitch applied */}
+                <button type="button"
+                  onClick={isPreviewing ? handleStopPreview : handlePreview}
+                  disabled={!audioBuffer}
+                  className="flex-1 min-w-[80px] rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-play-btn">
+                  {isPreviewing ? <><Square size={11} fill="currentColor" /> Stop</> : <><Play size={12} fill="currentColor" /> Preview</>}
+                </button>
+
+                {/* Save to History */}
+                {hasFeat('history') && (
+                  <button type="button" onClick={() => { void handleSaveToHistory() }}
+                    disabled={isSavingHistory || isRendering}
+                    className="flex-1 min-w-[80px] rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-save-btn">
+                    {isSavingHistory ? <><Loader2 size={11} className="animate-spin" /> Saving…</> : <><History size={11} /> Save</>}
+                  </button>
+                )}
+
+                {/* Download — renders with speed+pitch then saves */}
+                <button type="button" onClick={() => { void handleRenderAndDownload() }}
+                  disabled={isRendering || isSavingHistory}
+                  className="flex-1 min-w-[80px] rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-download-btn">
+                  {isRendering ? <><Loader2 size={11} className="animate-spin" /> Rendering…</> : <><Download size={12} /> Download</>}
+                </button>
+              </div>
+
+              <p className="text-xs" style={{ color: 'var(--muted)' }}>
+                Adjust speed &amp; pitch above, then Preview to hear them, then Save or Download to keep.
+              </p>
             </motion.div>
           )}
         </AnimatePresence>

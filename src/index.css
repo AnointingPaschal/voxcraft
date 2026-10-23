@@ -626,6 +626,15 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
   background:linear-gradient(135deg, var(--accent,#20d2a0) 0%, var(--accent-hover,#0ea882) 100%);
   color:var(--page,#0a121e);
 }
+.studio-save-btn {
+  background: color-mix(in srgb, #a78bfa 15%, transparent);
+  color: #a78bfa;
+  border: 1px solid color-mix(in srgb, #a78bfa 30%, transparent);
+}
+.studio-save-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #a78bfa 25%, transparent);
+}
+.studio-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .studio-close-btn {
   background:color-mix(in srgb,var(--ink,#f0faf7) 5%,transparent);
   border:1px solid color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent);
