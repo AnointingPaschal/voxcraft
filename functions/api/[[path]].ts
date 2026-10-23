@@ -122,8 +122,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const user = await requireAuth(env, req)
     if (!user) return e('Please sign in to use Voicera.', 401)
 
-    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number; voiceId?: string }
-    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch, voiceId } = body
+    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number; voiceId?: string; gender?: string }
+    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch, voiceId, gender } = body
     if (!text?.trim()) return e('Please enter a script to synthesize.')
 
     // ── Feature gate checks ──────────────────────────────────────────────────
@@ -194,6 +194,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
         'Semicolon (;) = medium pause between related clauses.',
         'Do NOT skip or rush over any punctuation.',
         'Do NOT merge sentences together without pausing.',
+        ...(typeof gender === 'string' && gender ? [`Use a ${gender} voice.`] : []),
       ].join(' '),
     }
     // Speed — baked into audio only when plan enables speed_control
