@@ -80,6 +80,7 @@ export interface VoiceSample {
   accent: string
   description: string
   audioDataUrl: string
+  transcript?: string
   imageDataUrl?: string       // optional avatar photo uploaded by admin
   updatedAt: number
   gender?: 'male' | 'female' | 'neutral'

@@ -846,6 +846,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       const match = loaded.find(v => v.name.toLowerCase() === currentAccent.label.toLowerCase())
       if (match?.audioDataUrl) {
         setReferenceDataUrl(match.audioDataUrl)
+        setReferenceTranscript(match.transcript ?? '')
         setSelectedVoiceId(match.id)
       }
     }).catch(() => null)
@@ -876,6 +877,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       const first = voices[0]
       setSelectedVoice(first)
       setReferenceDataUrl(first.audioDataUrl)
+      setReferenceTranscript(first.transcript ?? '')
       setSelectedVoiceId(first.id)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1276,8 +1278,10 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
               // If a voice is selected, restore its reference; otherwise clear entirely
               if (selectedVoice?.audioDataUrl) {
                 setReferenceDataUrl(selectedVoice.audioDataUrl)
+                setReferenceTranscript(selectedVoice.transcript ?? '')
               } else {
                 setReferenceDataUrl(null)
+                setReferenceTranscript('')
               }
               setSelectedVoiceId('')
             }}>
@@ -1286,12 +1290,19 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           </div>
         )}
 
-        {referenceFile && (
+        {referenceDataUrl && (
           <div>
-            <FieldLabel>Reference Transcript (optional)</FieldLabel>
-            <input type="text" value={referenceTranscript} onChange={e => setReferenceTranscript(e.target.value)}
-              placeholder="What the speaker says in the recording…"
-              className="w-full rounded-xl px-3 py-2.5 text-xs outline-none studio-text-input" />
+            <FieldLabel>{selectedVoice ? 'Voice Transcript (auto-loaded)' : 'Reference Transcript (optional)'}</FieldLabel>
+            <textarea
+              value={referenceTranscript}
+              onChange={e => !selectedVoice && setReferenceTranscript(e.target.value)}
+              readOnly={!!selectedVoice}
+              rows={3}
+              placeholder={selectedVoice ? 'No transcript saved for this voice yet — edit it in Admin → Voice Library.' : 'What the speaker says in the recording…'}
+              className={`w-full rounded-xl px-3 py-2.5 text-xs outline-none resize-none studio-text-input${selectedVoice ? ' opacity-60 cursor-default' : ''}`} />
+            {selectedVoice && !referenceTranscript && (
+              <p className="text-xs mt-1 text-amber-500">No transcript set — add one in Admin → Voice Library for better cloning quality.</p>
+            )}
           </div>
         )}
 
@@ -1466,7 +1477,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
               setSelectedVoice(v)
               setSelectedVoiceId(v.id)
               setReferenceDataUrl(v.audioDataUrl)
-              setReferenceTranscript('')
+              setReferenceTranscript(v.transcript ?? '')
             }}
             onClose={() => setPickerOpen(false)}
           />

@@ -155,6 +155,7 @@ export interface VoiceSample {
   accent: string
   description: string
   audioDataUrl: string
+  transcript?: string
   imageDataUrl?: string
   updatedAt: number
 }

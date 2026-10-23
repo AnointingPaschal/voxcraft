@@ -851,6 +851,14 @@ function VoiceCard({ voice, onSave, onDelete }: {
                   className="adm-input w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
                   placeholder="e.g. Warm, engaging narration" />
               </div>
+              <div>
+                <div className="text-[10px] font-semibold adm-muted uppercase mb-1">Reference Transcript <span className="normal-case font-normal">(exact words spoken in the audio clip)</span></div>
+                <textarea value={draft.transcript ?? ''} onChange={e => patch('transcript', e.target.value || undefined)}
+                  rows={3}
+                  className="adm-input w-full rounded-lg px-2.5 py-1.5 text-sm outline-none resize-none"
+                  placeholder="Type exactly what is said in the reference audio clip…" />
+                <p className="text-[10px] adm-muted mt-1">Match the transcript exactly — including punctuation — for the best voice cloning quality.</p>
+              </div>
               {/* Audio replacement */}
               <div>
                 <div className="text-[10px] font-semibold adm-muted uppercase mb-1">Replace Audio Clip</div>
@@ -976,6 +984,7 @@ function VoiceSamplesTab() {
         accent: accentLabel,
         description: description.trim() || `${genGender} · ${genStyle}`,
         audioDataUrl: dataUrl,
+        transcript: refTranscript.trim() || undefined,
         imageDataUrl: avatarDataUrl || undefined,
         updatedAt: Date.now(),
         gender: genGender === 'Male' ? 'male' : genGender === 'Female' ? 'female' : (gender ?? 'neutral'),
