@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Play, Square } from 'lucide-react'
 import type { VoiceSample } from '../lib/api'
 
@@ -39,6 +40,13 @@ export default function VoicePicker({ voices, selected, onSelect, onClose }: Pro
   // stop audio on unmount
   useEffect(() => () => { audioRef.current?.pause() }, [])
 
+  // lock body scroll while open
+  useEffect(() => {
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
   // close on backdrop click
   function handleBackdrop(e: React.MouseEvent) {
     if (e.target === e.currentTarget) onClose()
@@ -48,7 +56,7 @@ export default function VoicePicker({ voices, selected, onSelect, onClose }: Pro
     return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
   }
 
-  return (
+  return createPortal(
     <div
       className="voice-picker-backdrop"
       onClick={handleBackdrop}
@@ -134,6 +142,7 @@ export default function VoicePicker({ voices, selected, onSelect, onClose }: Pro
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

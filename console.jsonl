@@ -975,3 +975,13 @@
 {"level":"debug","message":"[vite] connected.","timestamp":1792786641323}
 {"level":"debug","message":"[vite] connected.","timestamp":1792786745280}
 {"level":"debug","message":"[vite] connected.","timestamp":1792786824033}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786889153}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786890280}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786891139}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792786968915}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792786968918}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792786968920}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792787628599}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792787628795}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792787628799}
+{"level":"debug","message":"[vite] connected.","timestamp":1792787654430}

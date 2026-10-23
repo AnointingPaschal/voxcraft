@@ -1397,7 +1397,9 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
 /* sheet */
 .voice-picker-backdrop {
   position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,.45);
+  background: rgba(0,0,0,.6);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   display: flex; align-items: flex-end; justify-content: center;
   animation: vp-fadein .15s ease;
 }
