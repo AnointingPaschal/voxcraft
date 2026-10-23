@@ -1238,8 +1238,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
       {/* Sample voices section removed — accent selection silently clones the matching voice */}
 
-      {/* Voice Print Cloning — hidden when an admin voice is selected (it already provides the reference) */}
-      {!selectedVoice && <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
+      {/* Voice Print Cloning — always visible; auto-loaded from selected admin voice */}
+      <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
         {!hasFeat('voice_clone') && (
           <div className="rounded-xl p-3 mb-3 flex items-center gap-2 text-xs studio-gate-banner">
             <Lock size={12} />
@@ -1247,15 +1247,40 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
             <button type="button" onClick={onPlans} className="ml-auto font-semibold studio-gate-upgrade">Upgrade</button>
           </div>
         )}
+
+        {/* Auto-loaded voice reference pill */}
+        {selectedVoice && (
+          <div className="flex items-center gap-2 rounded-xl px-3 py-2 mb-2 text-xs studio-ref-file studio-voice-ref">
+            {selectedVoice.imageDataUrl
+              ? <img src={selectedVoice.imageDataUrl} alt={selectedVoice.name} className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+              : <span className="w-6 h-6 rounded-full bg-current opacity-20 flex-shrink-0 flex items-center justify-center font-bold text-[9px]">{selectedVoice.name.slice(0, 2).toUpperCase()}</span>
+            }
+            <CheckCircle2 size={13} className="text-green-500 flex-shrink-0" />
+            <span className="truncate flex-1 font-medium">{selectedVoice.name} reference loaded</span>
+            <span className="opacity-50">auto</span>
+          </div>
+        )}
+
         <p className="text-xs leading-relaxed studio-section-hint">
-          Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker's vocal identity.
+          {selectedVoice
+            ? `Using ${selectedVoice.name}'s voice reference. Record or import below to override with your own.`
+            : 'Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker\'s vocal identity.'}
         </p>
 
         {referenceFile && (
           <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs studio-ref-file">
             <CheckCircle2 size={13} />
             <span className="truncate flex-1">{referenceFile.name}</span>
-            <button type="button" onClick={() => { setReferenceFile(null); setReferenceDataUrl(null); setSelectedVoiceId('') }}>
+            <button type="button" onClick={() => {
+              setReferenceFile(null)
+              // If a voice is selected, restore its reference; otherwise clear entirely
+              if (selectedVoice?.audioDataUrl) {
+                setReferenceDataUrl(selectedVoice.audioDataUrl)
+              } else {
+                setReferenceDataUrl(null)
+              }
+              setSelectedVoiceId('')
+            }}>
               <X size={12} />
             </button>
           </div>
@@ -1284,7 +1309,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
             <input type="file" accept="audio/*" className="hidden" disabled={!hasFeat('voice_clone')} onChange={e => { if (hasFeat('voice_clone') && e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
           </label>
         </div>
-      </Section>}
+      </Section>
 
       <Section title="Studio Script Editor" className="script-section" icon={<FileText size={14} className="section-icon" />}>
         <textarea

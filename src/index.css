@@ -509,6 +509,13 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
   color:var(--accent,#20d2a0);
 }
 
+/* Voice reference auto-loaded pill */
+.studio-voice-ref {
+  background: color-mix(in srgb, var(--accent, #20d2a0) 12%, transparent);
+  border: 1.5px solid color-mix(in srgb, var(--accent, #20d2a0) 35%, transparent);
+  color: var(--text, #1a1a1a);
+}
+
 /* Text inputs in studio */
 .studio-text-input {
   background:color-mix(in srgb,#000 25%,transparent);
