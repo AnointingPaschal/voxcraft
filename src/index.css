@@ -352,73 +352,32 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
 }
 .studio-usage-track { background:color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent); }
 
-/* Voice control block wrapper */
-.studio-voice-control-block {
-  padding: 0.875rem 1rem;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--ink, #f0faf7) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 8%, transparent);
-}
-
-/* Preset speed/pitch buttons */
-.studio-preset-btn {
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 5px;
-  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent);
-  background: color-mix(in srgb, var(--ink, #f0faf7) 6%, transparent);
-  color: color-mix(in srgb, var(--ink, #f0faf7) 60%, transparent);
+/* −/+ step buttons flanking sliders */
+.studio-pm-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 14%, transparent);
+  background: color-mix(in srgb, var(--ink, #f0faf7) 7%, transparent);
+  color: color-mix(in srgb, var(--ink, #f0faf7) 75%, transparent);
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.12s;
+  user-select: none;
 }
-.studio-preset-btn:hover {
+.studio-pm-btn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--accent, #20d2a0) 15%, transparent);
   color: var(--accent, #20d2a0);
-  border-color: var(--accent, #20d2a0);
+  border-color: color-mix(in srgb, var(--accent, #20d2a0) 40%, transparent);
 }
-
-/* Tick row under sliders */
-.studio-slider-ticks {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
-}
-.studio-tick-btn {
-  font-size: 0.6rem;
-  color: color-mix(in srgb, var(--ink, #f0faf7) 35%, transparent);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-  transition: color 0.1s;
-}
-.studio-tick-btn:hover, .studio-tick-btn.active {
-  color: var(--accent, #20d2a0);
-  font-weight: 700;
-}
-
-/* Fine-tune nudge buttons */
-.studio-nudge-btn {
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 0.18rem 0.45rem;
-  border-radius: 5px;
-  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 10%, transparent);
-  background: color-mix(in srgb, var(--ink, #f0faf7) 5%, transparent);
-  color: color-mix(in srgb, var(--ink, #f0faf7) 55%, transparent);
-  cursor: pointer;
-  transition: all 0.12s;
-}
-.studio-nudge-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--accent, #20d2a0) 12%, transparent);
-  color: var(--accent, #20d2a0);
-}
-.studio-nudge-btn:disabled { opacity: 0.35; cursor: not-allowed; }
-.studio-nudge-reset {
-  background: color-mix(in srgb, var(--ink, #f0faf7) 8%, transparent);
-  font-size: 0.6rem;
-}
+.studio-pm-btn:active:not(:disabled) { transform: scale(0.92); }
+.studio-pm-btn:disabled { opacity: 0.3; cursor: not-allowed; }
 
 /* Lock pill upgrade badge */
 .studio-lock-pill {
