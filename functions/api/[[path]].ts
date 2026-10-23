@@ -170,10 +170,31 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     if (!config.openrouterApiKey) return e('Voice engine not configured. Please contact admin.')
 
     const styledInput = accentInstruction ? `[${accentInstruction}] ${text.trim()}` : text.trim()
+    // Preserve punctuation: normalise smart quotes/dashes so the model sees
+    // standard ASCII punctuation, then add an explicit instruction to honour it.
+    const normalisedInput = styledInput
+      .replace(/[\u2018\u2019]/g, "'")   // smart single quotes → '
+      .replace(/[\u201C\u201D]/g, '"')   // smart double quotes → "
+      .replace(/\u2014|\u2013/g, ' — ')  // em/en dash → spaced dash
+      .replace(/\u2026/g, '...')         // ellipsis → ...
+
     const payload: Record<string, unknown> = {
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
-      input: styledInput,
+      input: normalisedInput,
       response_format: format,
+      instructions: [
+        'Read every punctuation mark exactly as written.',
+        'Full stop (.) = complete sentence pause.',
+        'Comma (,) = short breath pause.',
+        'Ellipsis (...) = thoughtful, trailing pause.',
+        'Question mark (?) = rising intonation.',
+        'Exclamation mark (!) = emphasis and energy.',
+        'Em dash (—) = abrupt mid-sentence break.',
+        'Colon (:) = slight pause before elaboration.',
+        'Semicolon (;) = medium pause between related clauses.',
+        'Do NOT skip or rush over any punctuation.',
+        'Do NOT merge sentences together without pausing.',
+      ].join(' '),
     }
     // Speed — baked into audio only when plan enables speed_control
     if (hasFx('speed_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
@@ -204,7 +225,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       await new Promise(r => setTimeout(r, 1200))
       upstream = await fetch('https://openrouter.ai/api/v1/audio/speech', {
         method: 'POST', headers: orHeaders,
-        body: JSON.stringify({ model: config.openrouterModel, input: text.trim(), ...(payload.input_references ? { input_references: payload.input_references } : {}) }),
+        body: JSON.stringify({ model: config.openrouterModel, input: normalisedInput, instructions: payload.instructions, ...(payload.input_references ? { input_references: payload.input_references } : {}) }),
       })
       if (!upstream.ok) {
         let friendly = 'Voice engine is busy. Please try again in a few seconds.'
