@@ -1265,7 +1265,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
         <p className="text-xs leading-relaxed studio-section-hint">
           {selectedVoice
-            ? `Using ${selectedVoice.name}'s voice reference. Record or import below to override with your own.`
+            ? `${selectedVoice.name}'s voice reference is loaded automatically. You can record or import your own sample below to override it.`
             : 'Capture 5 to 15 seconds of clear speech or import an existing audio sample to replicate any speaker\'s vocal identity.'}
         </p>
 
@@ -1290,19 +1290,15 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           </div>
         )}
 
-        {referenceDataUrl && (
+        {referenceFile && !selectedVoice && (
           <div>
-            <FieldLabel>{selectedVoice ? 'Voice Transcript (auto-loaded)' : 'Reference Transcript (optional)'}</FieldLabel>
+            <FieldLabel>Reference Transcript (optional but recommended)</FieldLabel>
             <textarea
               value={referenceTranscript}
-              onChange={e => !selectedVoice && setReferenceTranscript(e.target.value)}
-              readOnly={!!selectedVoice}
+              onChange={e => setReferenceTranscript(e.target.value)}
               rows={3}
-              placeholder={selectedVoice ? 'No transcript saved for this voice yet — edit it in Admin → Voice Library.' : 'What the speaker says in the recording…'}
-              className={`w-full rounded-xl px-3 py-2.5 text-xs outline-none resize-none studio-text-input${selectedVoice ? ' opacity-60 cursor-default' : ''}`} />
-            {selectedVoice && !referenceTranscript && (
-              <p className="text-xs mt-1 text-amber-500">No transcript set — add one in Admin → Voice Library for better cloning quality.</p>
-            )}
+              placeholder="Type exactly what the speaker says in the audio clip — improves cloning accuracy."
+              className="w-full rounded-xl px-3 py-2.5 text-xs outline-none resize-none studio-text-input" />
           </div>
         )}
 

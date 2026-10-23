@@ -221,9 +221,14 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       payload.pitch = pitch
     }
     if (referenceAudioDataUrl) {
-      const refs: unknown[] = [{ type: 'input_audio', input_audio: { data: referenceAudioDataUrl } }]
-      if (referenceTranscript?.trim()) refs.push({ type: 'text', text: referenceTranscript.trim() })
-      payload.input_references = refs
+      // Fish Audio expects each reference as { audio: <base64>, text: <transcript> }
+      // The audio must be raw base64 — strip the data URI prefix if present
+      const rawAudio = referenceAudioDataUrl.includes(',')
+        ? referenceAudioDataUrl.split(',')[1]
+        : referenceAudioDataUrl
+      const ref: Record<string, string> = { audio: rawAudio }
+      if (referenceTranscript?.trim()) ref.text = referenceTranscript.trim()
+      payload.input_references = [ref]
       // When cloning from reference audio Fish Audio is in voice-matching mode and
       // may suppress inline [break] cues. Use provider.options to pass Fish-native
       // parameters that work even in cloning mode:
@@ -256,7 +261,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       await new Promise(r => setTimeout(r, 1200))
       upstream = await fetch('https://openrouter.ai/api/v1/audio/speech', {
         method: 'POST', headers: orHeaders,
-        body: JSON.stringify({ model: config.openrouterModel, input: processedInput, instructions: payload.instructions, temperature: 0.5, repetition_penalty: 1.2, ...(payload.input_references ? { input_references: payload.input_references } : {}) }),
+        body: JSON.stringify({ model: config.openrouterModel, input: processedInput, instructions: payload.instructions, temperature: 0.3, repetition_penalty: 1.3, ...(payload.input_references ? { input_references: payload.input_references } : {}), ...(payload.provider ? { provider: payload.provider } : {}) }),
       })
       if (!upstream.ok) {
         let friendly = 'Voice engine is busy. Please try again in a few seconds.'
