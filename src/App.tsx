@@ -805,7 +805,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [selectedVoice, setSelectedVoice] = useState<VoiceSample | null>(null)
   const [_selectedVoiceId, setSelectedVoiceId] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [scriptMode, _setScriptMode] = useState<'narration' | 'conversation'>('narration')
+
   const [_timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
   const [pacing, setPacing] = useState(1.0)
@@ -958,22 +958,23 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     try {
       // Build instructions as a side-channel hint — NEVER prepended to the spoken text
       // (bracket prefixes get read aloud literally by the TTS model)
-      const instructionParts: string[] = []
-      // Use selected voice's accent label, or legacy accent value if no admin voices
-      const accentLabel = selectedVoice ? selectedVoice.accent.trim() : accent.value?.trim()
-      if (accentLabel) instructionParts.push(`Voice: ${selectedVoice?.name ?? ''}. Accent and dialect: ${accentLabel}.`)
-      if (selectedVoice?.gender) instructionParts.push(`Speaker gender: ${selectedVoice.gender}.`)
-      if (perfStyle?.trim()) instructionParts.push(`Performance style: ${perfStyle.trim()}.`)
-      if (scriptMode === 'conversation') instructionParts.push('This is a two-person conversation. Perform each speaker distinctly and do not read speaker labels aloud.')
-      const accentInstruction = instructionParts.join(' ')
+      // When a voice is selected, the reference audio carries the voice identity —
+      // send NO accent instruction so nothing extra gets prepended to the script.
+      // Only fall back to an accent instruction if there are no admin voices at all.
+      let accentInstruction: string | undefined
+      if (!selectedVoice) {
+        const parts: string[] = []
+        if (accent.value?.trim()) parts.push(`Accent and dialect: ${accent.value.trim()}.`)
+        if (perfStyle?.trim()) parts.push(`Performance style: ${perfStyle.trim()}.`)
+        if (parts.length) accentInstruction = parts.join(' ')
+      }
 
       const { blob, remaining } = await synthesize({
-        text: text.trim(),            // ONLY the user's script — nothing prepended
+        text: text.trim(),
         format,
-        accentInstruction: accentInstruction || undefined,
+        accentInstruction,
         speed: pacing,
         pitch,
-        gender: undefined,
         ...(selectedVoice ? { voiceId: selectedVoice.id } : {}),
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
@@ -996,7 +997,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       if (msg.includes('limit') || msg.includes('quota')) onPlans()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, text, scriptMode, format, accent, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
+  }, [user, text, format, accent, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
   // Stop any running Web Audio preview when speed/pitch changes so the user
   // can click Preview again to hear the updated settings
