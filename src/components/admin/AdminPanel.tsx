@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react'
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Globe, Key, Chrome, Banknote, ShieldCheck,
@@ -6,7 +6,7 @@ import {
   ChevronDown, ChevronUp, ArrowLeft, AudioWaveform, Menu,
   TrendingUp, UserCheck, Zap, AlertTriangle, Palette, Settings, Trash2, Upload,
   Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle,
-  Mic, Play, Sliders, X, Plus,
+  Mic, Play, Sliders, X, Plus, Pencil, Check, Square,
   type LucideIcon,
 } from 'lucide-react'
 import ThemeToggle from '../ThemeToggle'
@@ -704,6 +704,180 @@ function PaletteEditor({ title, palette, onChange }: {
 }
 
 // ── Voice Samples ─────────────────────────────────────────────────────────────
+// ── Inline-editable voice card ─────────────────────────────────────────────────
+function VoiceCard({ voice, onSave, onDelete }: {
+  voice: VoiceSample
+  onSave: (v: VoiceSample) => void
+  onDelete: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<VoiceSample>(voice)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [playing, setPlaying] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  function patch<K extends keyof VoiceSample>(k: K, v: VoiceSample[K]) {
+    setDraft(d => ({ ...d, [k]: v }))
+  }
+
+  function handleAvatarChange(file: File) {
+    if (file.size > 1_048_576) return
+    const r = new FileReader()
+    r.onload = () => patch('imageDataUrl', r.result as string)
+    r.readAsDataURL(file)
+  }
+
+  function handleAudioChange(file: File) {
+    if (file.size > 4_194_304) return
+    const r = new FileReader()
+    r.onload = () => {
+      const url = r.result as string
+      patch('audioDataUrl', url)
+      setPreviewUrl(url)
+    }
+    r.readAsDataURL(file)
+  }
+
+  function handlePlay() {
+    if (playing) {
+      audioRef.current?.pause()
+      setPlaying(false)
+      return
+    }
+    const src = previewUrl ?? draft.audioDataUrl
+    if (!audioRef.current) audioRef.current = new Audio()
+    audioRef.current.src = src
+    audioRef.current.onended = () => setPlaying(false)
+    void audioRef.current.play()
+    setPlaying(true)
+  }
+
+  function handleSave() {
+    onSave(draft)
+    setEditing(false)
+  }
+
+  function handleCancel() {
+    setDraft(voice)
+    setPreviewUrl(null)
+    setEditing(false)
+  }
+
+  return (
+    <div className="adm-card rounded-2xl p-4 flex flex-col gap-3">
+      {/* ── Header row ── */}
+      <div className="flex items-start gap-3">
+        {/* Avatar — clicking opens file picker when editing */}
+        <label className={`relative flex-shrink-0 w-12 h-12 rounded-full overflow-hidden flex items-center justify-center adm-metric-icon ${editing ? 'cursor-pointer voice-card-avatar-edit' : ''}`}>
+          {draft.imageDataUrl
+            ? <img src={draft.imageDataUrl} alt={draft.name} className="w-full h-full object-cover" />
+            : <AudioWaveform size={18} className="adm-accent" />}
+          {editing && (
+            <>
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                <Upload size={14} className="text-white" />
+              </div>
+              <input type="file" accept="image/*" className="hidden"
+                onChange={e => { if (e.target.files?.[0]) handleAvatarChange(e.target.files[0]) }} />
+            </>
+          )}
+        </label>
+
+        <div className="min-w-0 flex-1">
+          {editing ? (
+            <input value={draft.name} onChange={e => patch('name', e.target.value)}
+              className="adm-input w-full rounded-lg px-2.5 py-1.5 text-sm font-semibold outline-none mb-1"
+              placeholder="Voice name" />
+          ) : (
+            <div className="font-semibold text-sm adm-text">{voice.name}</div>
+          )}
+          <div className="text-xs adm-muted">
+            {[voice.gender, voice.accent, voice.description].filter(Boolean).join(' · ') || 'Sample voice'}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {editing ? (
+            <>
+              <button type="button" onClick={handleSave}
+                className="p-2 rounded-lg text-white bg-emerald-500 hover:bg-emerald-600 transition-colors" aria-label="Save">
+                <Check size={15} />
+              </button>
+              <button type="button" onClick={handleCancel}
+                className="p-2 rounded-lg adm-muted-btn transition-colors" aria-label="Cancel">
+                <X size={15} />
+              </button>
+            </>
+          ) : (
+            <button type="button" onClick={() => setEditing(true)}
+              className="p-2 rounded-lg adm-muted-btn transition-colors" aria-label="Edit">
+              <Pencil size={15} />
+            </button>
+          )}
+          <button type="button" onClick={onDelete}
+            className="p-2 rounded-lg adm-danger-btn" aria-label={`Delete ${voice.name}`}>
+            <Trash2 size={15} />
+          </button>
+        </div>
+      </div>
+
+      {/* ── Edit fields ── */}
+      <AnimatePresence>
+        {editing && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+            <div className="space-y-3 pt-1">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <div className="text-[10px] font-semibold adm-muted uppercase mb-1">Gender</div>
+                  <select value={draft.gender ?? 'neutral'}
+                    onChange={e => patch('gender', e.target.value as VoiceSample['gender'])}
+                    className="adm-select w-full rounded-lg px-2.5 py-1.5 text-sm outline-none">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="neutral">Neutral</option>
+                  </select>
+                </div>
+                <div>
+                  <div className="text-[10px] font-semibold adm-muted uppercase mb-1">Accent / Style</div>
+                  <input value={draft.accent} onChange={e => patch('accent', e.target.value)}
+                    className="adm-input w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
+                    placeholder="e.g. Lagos English" />
+                </div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold adm-muted uppercase mb-1">Description</div>
+                <input value={draft.description} onChange={e => patch('description', e.target.value)}
+                  className="adm-input w-full rounded-lg px-2.5 py-1.5 text-sm outline-none"
+                  placeholder="e.g. Warm, engaging narration" />
+              </div>
+              {/* Audio replacement */}
+              <div>
+                <div className="text-[10px] font-semibold adm-muted uppercase mb-1">Replace Audio Clip</div>
+                <div className="flex items-center gap-2">
+                  <label className="flex-1 adm-upload-zone rounded-xl px-3 py-2.5 text-xs flex items-center justify-center gap-2 cursor-pointer">
+                    <Upload size={13} /> Replace clip
+                    <input type="file" accept="audio/*" className="hidden"
+                      onChange={e => { if (e.target.files?.[0]) handleAudioChange(e.target.files[0]) }} />
+                  </label>
+                  <button type="button" onClick={handlePlay}
+                    className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors ${playing ? 'bg-red-100 text-red-600' : 'adm-muted-btn'}`}>
+                    {playing ? <><Square size={12} /> Stop</> : <><Play size={12} /> Listen</>}
+                  </button>
+                </div>
+                {previewUrl && <p className="text-[10px] adm-muted mt-1">New clip loaded — save to apply.</p>}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Audio player (collapsed when editing with a new clip) ── */}
+      {!editing && <audio className="w-full" controls src={voice.audioDataUrl} />}
+    </div>
+  )
+}
+
 function VoiceSamplesTab() {
   const [voices, setVoices] = useState<VoiceSample[]>([])
   const [loading, setLoading] = useState(true)
@@ -927,27 +1101,9 @@ function VoiceSamplesTab() {
       {/* Existing voices */}
       <div className="space-y-3">
         {voices.map(voice => (
-          <div key={voice.id} className="adm-card rounded-2xl p-4 flex flex-col gap-3">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center adm-metric-icon">
-                {voice.imageDataUrl
-                  ? <img src={voice.imageDataUrl} alt={voice.name} className="w-full h-full object-cover" />
-                  : <AudioWaveform size={18} className="adm-accent" />}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-semibold text-sm adm-text">{voice.name}</div>
-                <div className="text-xs mt-1 adm-muted">
-                  {[voice.gender && `${voice.gender}`, voice.accent, voice.description].filter(Boolean).join(' · ') || 'Sample voice'}
-                </div>
-              </div>
-              <button type="button"
-                onClick={() => { void saveVoices(voices.filter(v => v.id !== voice.id)) }}
-                className="p-2 rounded-lg adm-danger-btn" aria-label={`Delete ${voice.name}`}>
-                <Trash2 size={15} />
-              </button>
-            </div>
-            <audio className="w-full" controls src={voice.audioDataUrl} />
-          </div>
+          <VoiceCard key={voice.id} voice={voice}
+            onSave={updated => void saveVoices(voices.map(v => v.id === updated.id ? updated : v))}
+            onDelete={() => void saveVoices(voices.filter(v => v.id !== voice.id))} />
         ))}
         {!voices.length && (
           <div className="rounded-2xl p-8 text-center text-sm adm-empty-state">

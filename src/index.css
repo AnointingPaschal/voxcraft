@@ -1496,3 +1496,16 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
 .voice-picker-listen:hover { opacity: .85; }
 .voice-picker-listen.playing { background: var(--muted); }
 .voice-picker-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }
+
+/* Admin voice card inline edit */
+.voice-card-avatar-edit {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.adm-muted-btn {
+  background: var(--surface-2, rgba(0,0,0,.06));
+  color: var(--text-muted);
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.adm-muted-btn:hover { background: var(--surface-3, rgba(0,0,0,.12)); }

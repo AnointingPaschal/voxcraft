@@ -927,3 +927,43 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792785978828}
 {"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792785978828}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792785978829}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786011398}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792786187572}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792786187579}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792786187584}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786193672}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786194240}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786215451}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786216177}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786223198}
+{"level":"debug","message":"[vite] connected.","timestamp":1792786224756}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786244572}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786244572}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786244582}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786244582}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786246007}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786246007}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786246009}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786246009}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786248514}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786248514}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786268661}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786268661}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786268674}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786268674}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786271421}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786271422}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786271460}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786271461}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786272528}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786272529}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786272530}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786272531}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786282233}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786282233}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786282267}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786282267}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786283121}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786283122}
+{"level":"debug","message":"[vite] hot updated: /src/components/admin/AdminPanel.tsx","timestamp":1792786283123}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792786283123}
