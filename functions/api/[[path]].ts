@@ -170,32 +170,46 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     if (!config.openrouterApiKey) return e('Voice engine not configured. Please contact admin.')
 
     const styledInput = accentInstruction ? `[${accentInstruction}] ${text.trim()}` : text.trim()
-    // Preserve punctuation: normalise smart quotes/dashes so the model sees
-    // standard ASCII punctuation, then add an explicit instruction to honour it.
-    const normalisedInput = styledInput
-      .replace(/[\u2018\u2019]/g, "'")   // smart single quotes → '
-      .replace(/[\u201C\u201D]/g, '"')   // smart double quotes → "
-      .replace(/\u2014|\u2013/g, ' — ')  // em/en dash → spaced dash
-      .replace(/\u2026/g, '...')         // ellipsis → ...
+    // ── Text pre-processing ─────────────────────────────────────────────────
+    // 1. Normalise Unicode punctuation to ASCII equivalents
+    const normalised = styledInput
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      .replace(/\u2014|\u2013/g, ' — ')
+      .replace(/\u2026/g, '...')
+
+    // 2. Inject Fish Audio S2 pause markers at every punctuation boundary.
+    //    [break] = short pause (~300 ms), [long-break] = long pause (~600 ms).
+    //    Rules based on Fish Audio S2.1 documentation:
+    //      sentence end (. ? !)  → [long-break]
+    //      clause separator (, ; : —) → [break]
+    //      ellipsis (...)         → [long-break]
+    const processedInput = normalised
+      // sentence-ending punctuation followed by whitespace or end-of-string
+      .replace(/([.?!])(\s+|$)/g, '$1 [long-break] ')
+      // ellipsis
+      .replace(/\.\.\.(\s*)/g, '... [long-break] ')
+      // clause separators
+      .replace(/([,;:])(\s+)/g, '$1 [break] ')
+      // em dash used as a parenthetical break
+      .replace(/ — /g, ' [break] — [break] ')
+      // collapse any double spaces introduced above
+      .replace(/ {2,}/g, ' ')
+      .trim()
 
     const payload: Record<string, unknown> = {
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
-      input: normalisedInput,
+      input: processedInput,
       response_format: format,
+      // Keep instructions short — Fish Audio prepends this as [instructions] to the text
       instructions: [
-        'Read every punctuation mark exactly as written.',
-        'Full stop (.) = complete sentence pause.',
-        'Comma (,) = short breath pause.',
-        'Ellipsis (...) = thoughtful, trailing pause.',
-        'Question mark (?) = rising intonation.',
-        'Exclamation mark (!) = emphasis and energy.',
-        'Em dash (—) = abrupt mid-sentence break.',
-        'Colon (:) = slight pause before elaboration.',
-        'Semicolon (;) = medium pause between related clauses.',
-        'Do NOT skip or rush over any punctuation.',
-        'Do NOT merge sentences together without pausing.',
+        'Speak naturally with clear articulation.',
+        'Honour every pause marker in the text.',
         ...(typeof gender === 'string' && gender ? [`Use a ${gender} voice.`] : []),
       ].join(' '),
+      // Lower temperature = more consistent, deliberate delivery
+      temperature: 0.5,
+      repetition_penalty: 1.2,
     }
     // Speed — baked into audio only when plan enables speed_control
     if (hasFx('speed_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
@@ -226,7 +240,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       await new Promise(r => setTimeout(r, 1200))
       upstream = await fetch('https://openrouter.ai/api/v1/audio/speech', {
         method: 'POST', headers: orHeaders,
-        body: JSON.stringify({ model: config.openrouterModel, input: normalisedInput, instructions: payload.instructions, ...(payload.input_references ? { input_references: payload.input_references } : {}) }),
+        body: JSON.stringify({ model: config.openrouterModel, input: processedInput, instructions: payload.instructions, temperature: 0.5, repetition_penalty: 1.2, ...(payload.input_references ? { input_references: payload.input_references } : {}) }),
       })
       if (!upstream.ok) {
         let friendly = 'Voice engine is busy. Please try again in a few seconds.'
