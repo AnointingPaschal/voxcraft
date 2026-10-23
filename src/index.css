@@ -1282,6 +1282,32 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
   cursor: pointer;
 }
 
+/* Pitch range — purple accent */
+.adm-range-pitch { accent-color: #a78bfa; }
+
+/* −/+ step buttons in admin sliders */
+.adm-pm-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--site-border, rgba(0,0,0,.1));
+  background: var(--site-surface, rgba(255,255,255,.6));
+  color: var(--site-ink, #1a2e1a);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.1s;
+}
+.adm-pm-btn:hover { background: var(--site-accent, #20d2a0); color: #fff; border-color: var(--site-accent, #20d2a0); }
+.adm-pm-btn:active { transform: scale(0.9); }
+
+/* Horizontal rule inside admin cards */
+.adm-divider { border: none; border-top: 1px solid var(--site-border, rgba(0,0,0,.08)); margin: 0; }
+
 /* Ghost button for inline toggle groups */
 .adm-btn-ghost {
   background: transparent;

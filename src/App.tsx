@@ -790,6 +790,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       setSc(loaded)
       setAccent(loaded.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
       setPerfStyle(loaded.perfStyles[0] ?? '')
+      setPacing(loaded.speedDefault ?? DEFAULT_STUDIO_CONFIG.speedDefault)
+      setPitch(loaded.pitchDefault ?? DEFAULT_STUDIO_CONFIG.pitchDefault)
     }).catch(() => setSc(DEFAULT_STUDIO_CONFIG))
   }, [])
 
@@ -1040,19 +1042,19 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           </div>
           <div className="flex items-center gap-3">
             <button type="button" className="studio-pm-btn"
-              onClick={() => setPacing(p => Math.max(0.5, Math.round((p - 0.05) * 100) / 100))}
+              onClick={() => setPacing(p => Math.max(sc.speedMin, Math.round((p - 0.05) * 100) / 100))}
               aria-label="Decrease speed">−</button>
-            <input type="range" min="0.5" max="2.0" step="0.05" value={pacing}
+            <input type="range" min={sc.speedMin} max={sc.speedMax} step="0.05" value={pacing}
               onChange={e => setPacing(parseFloat(e.target.value))}
               className="flex-1 studio-speed-slider" />
             <button type="button" className="studio-pm-btn"
-              onClick={() => setPacing(p => Math.min(2.0, Math.round((p + 0.05) * 100) / 100))}
+              onClick={() => setPacing(p => Math.min(sc.speedMax, Math.round((p + 0.05) * 100) / 100))}
               aria-label="Increase speed">+</button>
           </div>
           <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--muted)' }}>
-            <span>0.5× Slow</span>
-            <span>1.0× Normal</span>
-            <span>2.0× Fast</span>
+            <span>{sc.speedMin}× Slow</span>
+            <span>{sc.speedDefault}× Normal</span>
+            <span>{sc.speedMax}× Fast</span>
           </div>
           {!hasFeat('speed_control') && (
             <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>
@@ -1079,21 +1081,21 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           <div className="flex items-center gap-3">
             <button type="button" className="studio-pm-btn"
               disabled={!hasFeat('pitch_control')}
-              onClick={() => hasFeat('pitch_control') && setPitch(p => Math.max(-12, p - 1))}
+              onClick={() => hasFeat('pitch_control') && setPitch(p => Math.max(sc.pitchMin, p - 1))}
               aria-label="Lower pitch">−</button>
-            <input type="range" min="-12" max="12" step="1" value={pitch}
+            <input type="range" min={sc.pitchMin} max={sc.pitchMax} step="1" value={pitch}
               onChange={e => setPitch(parseInt(e.target.value))}
               disabled={!hasFeat('pitch_control')}
               className={`flex-1 studio-pitch-slider ${!hasFeat('pitch_control') ? 'opacity-40 cursor-not-allowed' : ''}`} />
             <button type="button" className="studio-pm-btn"
               disabled={!hasFeat('pitch_control')}
-              onClick={() => hasFeat('pitch_control') && setPitch(p => Math.min(12, p + 1))}
+              onClick={() => hasFeat('pitch_control') && setPitch(p => Math.min(sc.pitchMax, p + 1))}
               aria-label="Raise pitch">+</button>
           </div>
           <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--muted)' }}>
-            <span>−12 Deep</span>
-            <span>0 Natural</span>
-            <span>+12 High</span>
+            <span>{sc.pitchMin} Deep</span>
+            <span>{sc.pitchDefault === 0 ? '0 Natural' : `${sc.pitchDefault > 0 ? '+' : ''}${sc.pitchDefault}`}</span>
+            <span>+{sc.pitchMax} High</span>
           </div>
           {!hasFeat('pitch_control') && (
             <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>

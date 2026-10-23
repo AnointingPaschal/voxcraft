@@ -97,6 +97,9 @@ export interface StudioConfig {
   speedMin: number
   speedMax: number
   speedDefault: number
+  pitchMin: number
+  pitchMax: number
+  pitchDefault: number
   maxChars: number
 }
 
@@ -128,6 +131,9 @@ const DEFAULT_STUDIO_CONFIG: StudioConfig = {
   speedMin: 0.5,
   speedMax: 2.0,
   speedDefault: 1.0,
+  pitchMin: -12,
+  pitchMax: 12,
+  pitchDefault: 0,
   maxChars: 10000,
 }
 

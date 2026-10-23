@@ -983,6 +983,72 @@ function StudioControlsTab() {
           className="flex items-center gap-1.5 text-xs adm-accent adm-add-btn px-3 py-2 rounded-lg"><Plus size={12} /> Add Template</button>
       </div>
 
+      {/* Speed & Pitch Defaults */}
+      <div className="adm-card rounded-2xl p-5 space-y-5">
+        <CardTitle icon={<Sliders size={14} />} title="Speed & Pitch Defaults" />
+        <p className="text-xs adm-dim -mt-2">Set the allowed range and starting value users see in the studio. Changes take effect on next page load.</p>
+
+        {/* Speed */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold adm-text">Speech Speed</p>
+          {(
+            [
+              { label: 'Minimum (×)', key: 'speedMin' as const, min: 0.25, max: 1.0,  step: 0.05 },
+              { label: 'Maximum (×)', key: 'speedMax' as const, min: 1.0,  max: 4.0,  step: 0.05 },
+              { label: 'Default (×)', key: 'speedDefault' as const, min: cfg.speedMin, max: cfg.speedMax, step: 0.05 },
+            ] as { label: string; key: 'speedMin' | 'speedMax' | 'speedDefault'; min: number; max: number; step: number }[]
+          ).map(({ label, key, min, max, step }) => (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs adm-dim">{label}</span>
+                <span className="text-xs font-mono font-bold adm-accent">{cfg[key].toFixed(2)}×</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className="adm-pm-btn"
+                  onClick={() => setCfg({ ...cfg, [key]: Math.max(min, Math.round((cfg[key] - step) * 100) / 100) })}>−</button>
+                <input type="range" min={min} max={max} step={step} value={cfg[key]}
+                  onChange={e => setCfg({ ...cfg, [key]: parseFloat(e.target.value) })}
+                  className="flex-1 adm-range" />
+                <button type="button" className="adm-pm-btn"
+                  onClick={() => setCfg({ ...cfg, [key]: Math.min(max, Math.round((cfg[key] + step) * 100) / 100) })}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="adm-divider" />
+
+        {/* Pitch */}
+        <div className="space-y-3">
+          <p className="text-xs font-semibold adm-text">Voice Pitch (semitones)</p>
+          {(
+            [
+              { label: 'Minimum (st)', key: 'pitchMin' as const, min: -24, max: 0,   step: 1 },
+              { label: 'Maximum (st)', key: 'pitchMax' as const, min: 0,   max: 24,  step: 1 },
+              { label: 'Default (st)', key: 'pitchDefault' as const, min: cfg.pitchMin, max: cfg.pitchMax, step: 1 },
+            ] as { label: string; key: 'pitchMin' | 'pitchMax' | 'pitchDefault'; min: number; max: number; step: number }[]
+          ).map(({ label, key, min, max, step }) => (
+            <div key={key}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs adm-dim">{label}</span>
+                <span className="text-xs font-mono font-bold" style={{ color: '#a78bfa' }}>
+                  {cfg[key] === 0 ? '±0 st' : `${cfg[key] > 0 ? '+' : ''}${cfg[key]} st`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" className="adm-pm-btn"
+                  onClick={() => setCfg({ ...cfg, [key]: Math.max(min, cfg[key] - step) })}>−</button>
+                <input type="range" min={min} max={max} step={step} value={cfg[key]}
+                  onChange={e => setCfg({ ...cfg, [key]: parseInt(e.target.value) })}
+                  className="flex-1 adm-range adm-range-pitch" />
+                <button type="button" className="adm-pm-btn"
+                  onClick={() => setCfg({ ...cfg, [key]: Math.min(max, cfg[key] + step) })}>+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Character Limits */}
       <div className="adm-card rounded-2xl p-5 space-y-3">
         <CardTitle icon={<Sliders size={14} />} title="Character Limits" />
