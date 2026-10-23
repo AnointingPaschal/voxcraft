@@ -802,7 +802,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [_timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
-  const [pacing] = useState(1.0)
+  const [pacing, setPacing] = useState(1.0)
   const [format, setFormat] = useState('mp3')
   const [text, setText] = useState('')
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
@@ -953,6 +953,11 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, text, scriptMode, format, accent, perfStyle, referenceDataUrl, referenceTranscript, startProgressTimer, stopProgressTimer, onSignIn, onPlans])
 
+  // Keep the audio element playback rate in sync with the pacing slider
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = pacing
+  }, [pacing])
+
   const handleDownload = useCallback(() => {
     if (!audioBlob) return
     const url = audioUrl ?? URL.createObjectURL(audioBlob)
@@ -1014,6 +1019,33 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
             <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
           </>
         ) : null}
+
+        {/* Speed / Pacing control — generation speed gated by pacing_control feature */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <FieldLabel>
+              Speech Speed
+              {!hasFeat('pacing_control') && (
+                <span className="ml-2 text-xs font-normal opacity-60">(playback only — <button type="button" className="underline" onClick={onPlans}>upgrade</button> for generation speed)</span>
+              )}
+            </FieldLabel>
+            <span className="text-xs font-mono font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>
+              {pacing.toFixed(2)}×
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0.5" max="2.0" step="0.05"
+            value={pacing}
+            onChange={e => setPacing(parseFloat(e.target.value))}
+            className="w-full studio-speed-slider"
+          />
+          <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--muted)' }}>
+            <span>0.5× Slow</span>
+            <span>1.0× Normal</span>
+            <span>2.0× Fast</span>
+          </div>
+        </div>
 
         <div className="flex items-end gap-4">
           <div className="w-48">
@@ -1166,7 +1198,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
                 <CheckCircle2 size={14} className="studio-check-icon" />
                 <span className="text-sm font-semibold studio-audio-ready">Audio Ready</span>
               </div>
-              <audio ref={audioRef} src={audioUrl} controls className="w-full mb-3" style={{ borderRadius: 8, height: 36 }} />
+              <audio ref={audioRef} src={audioUrl} controls className="w-full mb-3" style={{ borderRadius: 8, height: 36 }}
+                onLoadedMetadata={e => { (e.currentTarget).playbackRate = pacing }} />
               <div className="flex gap-2">
                 <button type="button" onClick={() => { void audioRef.current?.play() }}
                   className="flex-1 rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-play-btn">

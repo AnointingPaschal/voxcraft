@@ -352,6 +352,45 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
 }
 .studio-usage-track { background:color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent); }
 
+/* Speech Speed slider */
+.studio-speed-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    var(--accent, #20d2a0) 0%,
+    var(--accent, #20d2a0) calc((var(--val, 1) - 0.5) / 1.5 * 100%),
+    color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent) calc((var(--val, 1) - 0.5) / 1.5 * 100%),
+    color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent) 100%
+  );
+}
+.studio-speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #20d2a0);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  transition: transform 0.1s;
+}
+.studio-speed-slider::-webkit-slider-thumb:active { transform: scale(1.25); }
+.studio-speed-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent, #20d2a0);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
 /* Timbre buttons */
 .timbre-btn {
   background:color-mix(in srgb,var(--ink,#f0faf7) 5%,transparent);

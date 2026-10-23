@@ -122,8 +122,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const user = await requireAuth(env, req)
     if (!user) return e('Please sign in to use Voicera.', 401)
 
-    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string }
-    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript } = body
+    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number }
+    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed } = body
     if (!text?.trim()) return e('Please enter a script to synthesize.')
 
     // ── Feature gate checks ──────────────────────────────────────────────────
@@ -166,6 +166,10 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
       input: styledInput,
       response_format: format,
+    }
+    // Speed param — only applied at generation time when plan enables pacing_control
+    if (hasFx('pacing_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
+      payload.speed = Math.round(speed * 100) / 100
     }
     if (referenceAudioDataUrl) {
       const refs: unknown[] = [{ type: 'input_audio', input_audio: { data: referenceAudioDataUrl } }]
