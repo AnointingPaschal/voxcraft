@@ -859,10 +859,10 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   // Feature gate helper — returns true when the user's plan has the feature enabled
   const hasFeat = (id: string) => (usage?.enabledFeatures ?? []).includes(id as never)
 
-  // Voices from admin — these ARE the accent options.
-  // voice_library feature gate: if disabled, no admin voices are shown.
-  const VOICE_OPTIONS = hasFeat('voice_library') ? voices : []
-  // Legacy accent options filtered by feature flags (shown only when no admin voices exist)
+  // Voices from admin — filter by allowedVoiceIds from usage (empty = all allowed)
+  const allowedIds = usage?.allowedVoiceIds ?? []
+  const VOICE_OPTIONS = voices.filter(v => allowedIds.length === 0 || allowedIds.includes(v.id))
+  // Legacy accent fallback — only used when no voices uploaded yet
   const ACCENT_OPTIONS = voices.length > 0 ? [] : sc.accentOptions.filter(a => {
     const fid = ACCENT_KEY_TO_FEATURE[a.label]
     return !fid || hasFeat(fid)
@@ -972,6 +972,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         speed: pacing,
         pitch,
         gender: undefined,
+        ...(selectedVoice ? { voiceId: selectedVoice.id } : {}),
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
 
@@ -1122,16 +1123,16 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
         <div className="flex items-center justify-between mb-1">
           <FieldLabel>Voice</FieldLabel>
-          {voices.length > 0 && !hasFeat('voice_library') && (
+          {voices.length > 0 && allowedIds.length > 0 && voices.length > VOICE_OPTIONS.length && (
             <button type="button" onClick={onPlans}
               className="text-xs flex items-center gap-1 studio-gate-upgrade">
-              <Lock size={10} /> Upgrade to access voices
+              <Lock size={10} /> {voices.length - VOICE_OPTIONS.length} locked
             </button>
           )}
         </div>
 
         {voices.length > 0 ? (
-          /* ── Admin voices are the accent selector ── */
+          /* ── Admin voices are the voice selector ── */
           <SelectField
             value={selectedVoice?.id ?? ''}
             onChange={v => {
@@ -1143,7 +1144,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
               setReferenceTranscript('')
             }}
             options={VOICE_OPTIONS.map(v => ({
-              label: `${v.name}${v.gender ? ` (${v.gender})` : ''} — ${v.accent}`,
+              label: `${v.name}${v.gender ? ` (${v.gender})` : ''}`,
               value: v.id,
             }))}
           />

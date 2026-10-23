@@ -159,6 +159,7 @@ export interface Plan {
   tokenPeriod?: 'day' | 'month'
   features: string[]
   enabledFeatures?: FeatureId[]
+  allowedVoiceIds?: string[]
   historyRetentionDays?: number
   charLimit?: number
   popular?: boolean
@@ -271,6 +272,7 @@ export interface UsageData {
   plan: string
   period: 'day' | 'month'
   enabledFeatures: FeatureId[]
+  allowedVoiceIds: string[]
   historyRetentionDays: number
   charLimit: number
 }

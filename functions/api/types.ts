@@ -79,6 +79,7 @@ export interface Plan {
   tokenPeriod?: 'day' | 'month'
   features: string[]
   enabledFeatures?: FeatureId[]
+  allowedVoiceIds?: string[]     // voice IDs from the library; empty/absent = all voices
   historyRetentionDays?: number  // 0 = no history; >0 = days to keep audio
   charLimit?: number             // max chars per single synthesis (0 = platform default)
   popular?: boolean

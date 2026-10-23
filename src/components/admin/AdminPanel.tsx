@@ -450,13 +450,18 @@ function ConfigTabInner({ section }: { section: ConfigSection }) {
 // ── Plans ─────────────────────────────────────────────────────────────────────
 function PlansTab() {
   const [plans, setPlans] = useState<Plan[]>([])
+  const [allVoices, setAllVoices] = useState<VoiceSample[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   useEffect(() => {
-    adminGetPlans().then(setPlans).catch(console.error).finally(() => setLoading(false))
+    Promise.all([
+      adminGetPlans(),
+      adminGetVoiceSamples(),
+    ]).then(([p, v]) => { setPlans(p); setAllVoices(v) })
+      .catch(console.error).finally(() => setLoading(false))
   }, [])
 
   const update = useCallback((id: string, patch: Partial<Plan>) =>
@@ -573,6 +578,49 @@ function PlansTab() {
                         <Zap size={12} className="adm-accent-text" />
                         Platform Features
                       </div>
+
+                      {/* ── Voice picker ─────────────────────────────── */}
+                      {allVoices.length > 0 && (() => {
+                        const allowedIds = new Set<string>(plan.allowedVoiceIds ?? [])
+                        const allSelected = plan.allowedVoiceIds === undefined || plan.allowedVoiceIds.length === 0
+                        const toggleVoice = (vid: string) => {
+                          const current = allSelected ? allVoices.map(v => v.id) : [...(plan.allowedVoiceIds ?? [])]
+                          const next = current.includes(vid) ? current.filter(x => x !== vid) : [...current, vid]
+                          update(plan.id, { allowedVoiceIds: next.length === allVoices.length ? [] : next })
+                        }
+                        return (
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="text-[10px] font-bold adm-muted uppercase tracking-widest">Voices</div>
+                              <button type="button"
+                                className="text-[10px] adm-accent-text font-semibold"
+                                onClick={() => update(plan.id, { allowedVoiceIds: allSelected ? [] : undefined })}>
+                                {allSelected ? 'Deselect all' : 'Select all'}
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 gap-1.5">
+                              {allVoices.map(v => {
+                                const on = allSelected || allowedIds.has(v.id)
+                                return (
+                                  <label key={v.id}
+                                    className={`flex items-start gap-3 rounded-xl p-2.5 cursor-pointer transition-all border ${on ? 'adm-feature-on' : 'adm-feature-off'}`}
+                                    onClick={() => toggleVoice(v.id)}>
+                                    <span className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded flex items-center justify-center transition-all ${on ? 'bg-emerald-500' : 'adm-feature-check-off'}`}>
+                                      {on && <CheckCircle2 size={12} className="text-white" />}
+                                    </span>
+                                    <span className="flex-1 min-w-0">
+                                      <span className={`block text-xs font-semibold ${on ? 'adm-text' : 'adm-muted'}`}>{v.name}{v.gender ? ` (${v.gender})` : ''}</span>
+                                      <span className="block text-[10px] adm-muted mt-0.5">{v.accent}</span>
+                                    </span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
+
+                      {/* ── Non-accent feature flags ──────────────────── */}
                       {(() => {
                         const enabled = new Set<string>(plan.enabledFeatures ?? [])
                         const toggleFx = (id: FeatureId) => {
@@ -581,7 +629,9 @@ function PlansTab() {
                             : [...(plan.enabledFeatures ?? []), id]
                           update(plan.id, { enabledFeatures: next })
                         }
-                        const categories = [...new Set(PLATFORM_FEATURES.map(f => f.category))]
+                        const categories = [...new Set(
+                          PLATFORM_FEATURES.filter(f => f.category !== 'Accents').map(f => f.category)
+                        )]
                         return (
                           <div className="space-y-4">
                             {categories.map(cat => (

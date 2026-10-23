@@ -114,7 +114,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const now = new Date()
     const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
     const usage = await getUsage(env, user.id, periodKey)
-    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0, charLimit: plan.charLimit ?? 10000 })
+    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], allowedVoiceIds: plan.allowedVoiceIds ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0, charLimit: plan.charLimit ?? 10000 })
   }
 
   // ── TTS Synthesize ────────────────────────────────────────────────────────
@@ -122,8 +122,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const user = await requireAuth(env, req)
     if (!user) return e('Please sign in to use Voicera.', 401)
 
-    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number }
-    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch } = body
+    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number; voiceId?: string }
+    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch, voiceId } = body
     if (!text?.trim()) return e('Please enter a script to synthesize.')
 
     // ── Feature gate checks ──────────────────────────────────────────────────
@@ -133,6 +133,11 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
 
     const charCap = userPlan.charLimit ?? 10000
     if (text.trim().length > charCap) return e(`Your script exceeds the ${charCap.toLocaleString()}-character limit for your plan. Upgrade for a higher limit.`, 400)
+    // Voice access gate — allowedVoiceIds empty means all voices allowed
+    if (voiceId) {
+      const allowed = userPlan.allowedVoiceIds ?? []
+      if (allowed.length > 0 && !allowed.includes(voiceId)) return e('This voice is not available on your current plan. Upgrade to access more voices.', 403)
+    }
     const hasFx = (id: string) => fx.includes(id as never)
 
     // WAV format gate
