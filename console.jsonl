@@ -778,3 +778,45 @@
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792776619075}
 {"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792776619093}
 {"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792776619093}
+{"level":"debug","message":"[vite] connected.","timestamp":1792776659988}
+{"level":"debug","message":"[vite] connected.","timestamp":1792776663142}
+{"level":"debug","message":"[vite] connected.","timestamp":1792776665102}
+{"level":"debug","message":"[vite] connected.","timestamp":1792776673628}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792777019151}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792777019456}
+{"level":"log","message":"[vite] server connection lost. Polling for restart...","timestamp":1792777019458}
+{"level":"debug","message":"[vite] connected.","timestamp":1792777029745}
+{"level":"debug","message":"[vite] connected.","timestamp":1792777030214}
+{"level":"debug","message":"[vite] connected.","timestamp":1792777170446}
+{"level":"debug","message":"[vite] connected.","timestamp":1792777175346}
+{"level":"debug","message":"[vite] connected.","timestamp":1792777195761}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777218403}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777218403}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777218404}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777218404}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777224462}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777224462}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777224463}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777224463}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777228886}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777228886}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777228887}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777228887}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777242198}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777242198}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777242201}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777242201}
+{"level":"error","message":"[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)","timestamp":1792777249603}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777250089}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777250089}
+{"level":"error","message":"[vite] Failed to reload /src/App.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)","timestamp":1792777250307}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777250308}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777250308}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777258464}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777258465}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777258466}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777258466}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777263146}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777263146}
+{"level":"debug","message":"[vite] hot updated: /src/App.tsx","timestamp":1792777263147}
+{"level":"debug","message":"[vite] hot updated: /src/index.css","timestamp":1792777263147}

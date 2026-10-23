@@ -801,6 +801,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
   const [accent, setAccent] = useState(() => sc.accentOptions[0] ?? DEFAULT_STUDIO_CONFIG.accentOptions[0])
   const [voices, setVoices] = useState<VoiceSample[]>([])
+  const [selectedVoice, setSelectedVoice] = useState<VoiceSample | null>(null)
   const [_selectedVoiceId, setSelectedVoiceId] = useState('')
   const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [_timbre] = useState<Timbre>('Auto / Match')
@@ -858,13 +859,27 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   // Feature gate helper — returns true when the user's plan has the feature enabled
   const hasFeat = (id: string) => (usage?.enabledFeatures ?? []).includes(id as never)
 
-  // Filter accents to only those enabled for the user's plan — hidden entirely, not just locked
-  const ACCENT_OPTIONS = sc.accentOptions.filter(a => {
+  // Voices from admin — these ARE the accent options.
+  // voice_library feature gate: if disabled, no admin voices are shown.
+  const VOICE_OPTIONS = hasFeat('voice_library') ? voices : []
+  // Legacy accent options filtered by feature flags (shown only when no admin voices exist)
+  const ACCENT_OPTIONS = voices.length > 0 ? [] : sc.accentOptions.filter(a => {
     const fid = ACCENT_KEY_TO_FEATURE[a.label]
     return !fid || hasFeat(fid)
   })
 
-  // If the currently-selected accent was filtered out, silently switch to the first available
+  // Auto-select first voice when voices load
+  useEffect(() => {
+    if (voices.length > 0 && !selectedVoice) {
+      const first = voices[0]
+      setSelectedVoice(first)
+      setReferenceDataUrl(first.audioDataUrl)
+      setSelectedVoiceId(first.id)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voices])
+
+  // If the currently-selected accent (legacy) was filtered out, silently switch to the first available
   useEffect(() => {
     if (!usage) return // wait until features are loaded
     const valid = ACCENT_OPTIONS.find(a => a.label === accent?.label || a.value === accent?.value)
@@ -942,8 +957,10 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       // Build instructions as a side-channel hint — NEVER prepended to the spoken text
       // (bracket prefixes get read aloud literally by the TTS model)
       const instructionParts: string[] = []
-      // timbre removed from UI — no gender instruction added
-      if (accent.value?.trim()) instructionParts.push(`Accent and dialect: ${accent.value.trim()}.`)
+      // Use selected voice's accent label, or legacy accent value if no admin voices
+      const accentLabel = selectedVoice ? selectedVoice.accent.trim() : accent.value?.trim()
+      if (accentLabel) instructionParts.push(`Voice: ${selectedVoice?.name ?? ''}. Accent and dialect: ${accentLabel}.`)
+      if (selectedVoice?.gender) instructionParts.push(`Speaker gender: ${selectedVoice.gender}.`)
       if (perfStyle?.trim()) instructionParts.push(`Performance style: ${perfStyle.trim()}.`)
       if (scriptMode === 'conversation') instructionParts.push('This is a two-person conversation. Perform each speaker distinctly and do not read speaker labels aloud.')
       const accentInstruction = instructionParts.join(' ')
@@ -1104,28 +1121,47 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
       <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
         <div className="flex items-center justify-between mb-1">
-          <FieldLabel>Dialect &amp; Accent</FieldLabel>
-          {sc.accentOptions.length > ACCENT_OPTIONS.length && (
+          <FieldLabel>Voice</FieldLabel>
+          {voices.length > 0 && !hasFeat('voice_library') && (
             <button type="button" onClick={onPlans}
               className="text-xs flex items-center gap-1 studio-gate-upgrade">
-              <Lock size={10} /> {sc.accentOptions.length - ACCENT_OPTIONS.length} locked
+              <Lock size={10} /> Upgrade to access voices
             </button>
           )}
         </div>
-        <SelectField value={accent.label} onChange={v => {
-          const chosen = ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0]
-          setAccent(chosen)
-          // Silently wire the clone reference: find a voice whose name matches the accent label
-          const matchingVoice = voices.find(voice => voice.name.toLowerCase() === chosen.label.toLowerCase())
-          if (matchingVoice?.audioDataUrl) {
-            setReferenceDataUrl(matchingVoice.audioDataUrl)
-            setSelectedVoiceId(matchingVoice.id)
-            setReferenceTranscript('')
-          } else {
-            // No matching sample — clear any previously set clone reference from accent selection
-            if (!referenceFile) { setReferenceDataUrl(null); setSelectedVoiceId('') }
-          }
-        }} options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
+
+        {voices.length > 0 ? (
+          /* ── Admin voices are the accent selector ── */
+          <SelectField
+            value={selectedVoice?.id ?? ''}
+            onChange={v => {
+              const voice = VOICE_OPTIONS.find(vx => vx.id === v)
+              if (!voice) return
+              setSelectedVoice(voice)
+              setSelectedVoiceId(voice.id)
+              setReferenceDataUrl(voice.audioDataUrl)
+              setReferenceTranscript('')
+            }}
+            options={VOICE_OPTIONS.map(v => ({
+              label: `${v.name}${v.gender ? ` (${v.gender})` : ''} — ${v.accent}`,
+              value: v.id,
+            }))}
+          />
+        ) : (
+          /* ── Fallback: legacy accent list when no voices uploaded ── */
+          <>
+            {sc.accentOptions.length > ACCENT_OPTIONS.length && (
+              <button type="button" onClick={onPlans}
+                className="text-xs flex items-center gap-1 studio-gate-upgrade mb-1">
+                <Lock size={10} /> {sc.accentOptions.length - ACCENT_OPTIONS.length} locked
+              </button>
+            )}
+            <SelectField value={accent.label} onChange={v => {
+              const chosen = ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0]
+              if (chosen) setAccent(chosen)
+            }} options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
+          </>
+        )}
 
         {hasFeat('perf_style') ? (
           <>
@@ -1223,7 +1259,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
 
       {/* Sample voices section removed — accent selection silently clones the matching voice */}
 
-      <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
+      {/* Voice Print Cloning — hidden when an admin voice is selected (it already provides the reference) */}
+      {!selectedVoice && <Section title="Voice Print Cloning" className="clone-section" icon={<Mic size={14} className="section-icon" />}>
         {!hasFeat('voice_clone') && (
           <div className="rounded-xl p-3 mb-3 flex items-center gap-2 text-xs studio-gate-banner">
             <Lock size={12} />
@@ -1268,7 +1305,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
             <input type="file" accept="audio/*" className="hidden" disabled={!hasFeat('voice_clone')} onChange={e => { if (hasFeat('voice_clone') && e.target.files?.[0]) handleFileUpload(e.target.files[0]) }} />
           </label>
         </div>
-      </Section>
+      </Section>}
 
       <Section title="Studio Script Editor" className="script-section" icon={<FileText size={14} className="section-icon" />}>
         <div className="mode-switch">

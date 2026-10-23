@@ -150,6 +150,7 @@ export interface JWTPayload {
 export interface VoiceSample {
   id: string
   name: string
+  gender?: string
   accent: string
   description: string
   audioDataUrl: string
