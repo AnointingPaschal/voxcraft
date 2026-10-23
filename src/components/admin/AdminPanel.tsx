@@ -540,6 +540,18 @@ function PlansTab() {
                     </div>
                     {/* ── History retention ─────────────────────────── */}
                     <div className="mt-1">
+                      <Field label="Characters per Synthesis">
+                        <div className="flex items-center gap-3">
+                          <AInput
+                            value={String(plan.charLimit ?? 10000)}
+                            type="number"
+                            onChange={v => update(plan.id, { charLimit: Math.max(1, Number(v)) })}
+                          />
+                          <span className="text-xs adm-muted whitespace-nowrap">
+                            Max script length per generation
+                          </span>
+                        </div>
+                      </Field>
                       <Field label="History Retention (days — 0 = disabled)">
                         <div className="flex items-center gap-3">
                           <AInput

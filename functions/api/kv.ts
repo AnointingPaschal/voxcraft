@@ -103,17 +103,17 @@ const ALL_ACCENTS: FeatureId[] = [
 ]
 
 const DEFAULT_PLANS: Plan[] = [
-  { id: 'free',       name: 'Free',       price: 0,  priceNgn: 0, tokensPerDay: 500,    tokenPeriod: 'day',   historyRetentionDays: 0,
-    features: ['500 chars/day', '3 accents', 'MP3 only', 'Basic quality'],
+  { id: 'free',       name: 'Free',       price: 0,  priceNgn: 0, tokensPerDay: 500,    tokenPeriod: 'day',   historyRetentionDays: 0,  charLimit: 500,
+    features: ['500 chars/day', '500 chars/synthesis', '3 accents', 'MP3 only', 'Basic quality'],
     enabledFeatures: ['accent_nigerian_pidgin', 'accent_nigerian_std', 'accent_lagos_exec', 'format_mp3', 'download_audio'] },
-  { id: 'starter',    name: 'Starter',    price: 5,  tokensPerDay: 5000,   tokenPeriod: 'month', historyRetentionDays: 0, popular: false,
-    features: ['5,000 chars/month', 'All African accents', 'MP3 + WAV', 'Voice cloning'],
+  { id: 'starter',    name: 'Starter',    price: 5,  tokensPerDay: 5000,   tokenPeriod: 'month', historyRetentionDays: 0,  charLimit: 2000, popular: false,
+    features: ['5,000 chars/month', '2,000 chars/synthesis', 'All African accents', 'MP3 + WAV', 'Voice cloning'],
     enabledFeatures: ['accent_nigerian_pidgin', 'accent_nigerian_std', 'accent_lagos_exec', 'accent_ghanaian', 'accent_kenyan', 'accent_south_african', 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'perf_style', 'download_audio', 'vocal_cues'] },
-  { id: 'pro',        name: 'Pro',        price: 15, tokensPerDay: 25000,  tokenPeriod: 'month', historyRetentionDays: 30, popular: true,
-    features: ['25,000 chars/month', 'All accents', 'MP3 + WAV', 'Voice cloning', 'Priority queue', '30-day history'],
+  { id: 'pro',        name: 'Pro',        price: 15, tokensPerDay: 25000,  tokenPeriod: 'month', historyRetentionDays: 30, charLimit: 10000, popular: true,
+    features: ['25,000 chars/month', '10,000 chars/synthesis', 'All accents', 'MP3 + WAV', 'Voice cloning', 'Priority queue', '30-day history'],
     enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'speed_control', 'pitch_control', 'priority_queue', 'download_audio', 'history'] },
-  { id: 'enterprise', name: 'Enterprise', price: 49, tokensPerDay: 200000, tokenPeriod: 'month', historyRetentionDays: 90, popular: false,
-    features: ['200,000 chars/month', 'All accents', 'All formats', 'Unlimited cloning', '90-day history', 'API access'],
+  { id: 'enterprise', name: 'Enterprise', price: 49, tokensPerDay: 200000, tokenPeriod: 'month', historyRetentionDays: 90, charLimit: 50000, popular: false,
+    features: ['200,000 chars/month', '50,000 chars/synthesis', 'All accents', 'All formats', 'Unlimited cloning', '90-day history', 'API access'],
     enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'speed_control', 'pitch_control', 'priority_queue', 'batch_synthesis', 'download_audio', 'history', 'api_access'] },
 ]
 

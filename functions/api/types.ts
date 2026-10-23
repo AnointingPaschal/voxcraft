@@ -80,6 +80,7 @@ export interface Plan {
   features: string[]
   enabledFeatures?: FeatureId[]
   historyRetentionDays?: number  // 0 = no history; >0 = days to keep audio
+  charLimit?: number             // max chars per single synthesis (0 = platform default)
   popular?: boolean
   flwPlanId?: string
 }

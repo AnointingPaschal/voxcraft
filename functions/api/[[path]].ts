@@ -114,7 +114,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const now = new Date()
     const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
     const usage = await getUsage(env, user.id, periodKey)
-    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0 })
+    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0, charLimit: plan.charLimit ?? 10000 })
   }
 
   // ── TTS Synthesize ────────────────────────────────────────────────────────
@@ -130,6 +130,9 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const plans = await getPlans(env)
     const userPlan = plans.find(p => p.id === user.plan) ?? plans[0]!
     const fx = userPlan.enabledFeatures ?? []
+
+    const charCap = userPlan.charLimit ?? 10000
+    if (text.trim().length > charCap) return e(`Your script exceeds the ${charCap.toLocaleString()}-character limit for your plan. Upgrade for a higher limit.`, 400)
     const hasFx = (id: string) => fx.includes(id as never)
 
     // WAV format gate

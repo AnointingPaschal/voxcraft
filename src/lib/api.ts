@@ -160,6 +160,7 @@ export interface Plan {
   features: string[]
   enabledFeatures?: FeatureId[]
   historyRetentionDays?: number
+  charLimit?: number
   popular?: boolean
   flwPlanId?: string
 }
@@ -271,6 +272,7 @@ export interface UsageData {
   period: 'day' | 'month'
   enabledFeatures: FeatureId[]
   historyRetentionDays: number
+  charLimit: number
 }
 
 export async function getUsage(): Promise<UsageData> {

@@ -826,6 +826,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   // Rendering state (when user clicks Save or Download)
   const [isRendering, setIsRendering] = useState(false)
   const [isSavingHistory, setIsSavingHistory] = useState(false)
+  const [savedToHistory, setSavedToHistory] = useState(false)
   const [stageIndex, setStageIndex] = useState(0)
   const [stageProgress, setStageProgress] = useState(0)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -934,7 +935,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     if (!text.trim()) return
     setStageIndex(0); setStageProgress(0); setElapsedMs(0)
     startTimeRef.current = Date.now()
-    setStatus('loading'); setErrorMsg(''); setAudioUrl(null); setAudioBlob(null)
+    setStatus('loading'); setErrorMsg(''); setAudioUrl(null); setAudioBlob(null); setSavedToHistory(false)
     startProgressTimer()
 
     try {
@@ -1010,31 +1011,6 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     setIsPreviewing(false)
   }, [])
 
-  const handleRenderAndDownload = useCallback(async () => {
-    if (!audioBuffer && !audioBlob) return
-    setIsRendering(true)
-    try {
-      let blob: Blob
-      if (audioBuffer && (pacing !== 1.0 || pitch !== 0)) {
-        blob = await renderAudio(audioBuffer, pacing, pitch)
-      } else {
-        blob = audioBlob!
-      }
-      const a = document.createElement('a')
-      a.href = URL.createObjectURL(blob)
-      a.download = `voicera-output-${pacing.toFixed(2)}x-${pitch >= 0 ? '+' : ''}${pitch}st.wav`
-      a.click()
-    } catch {
-      toast.error('Render failed. Try downloading the raw audio.')
-      const a = document.createElement('a')
-      a.href = audioUrl ?? URL.createObjectURL(audioBlob!)
-      a.download = `voicera-output.${format}`
-      a.click()
-    } finally {
-      setIsRendering(false)
-    }
-  }, [audioBuffer, audioBlob, audioUrl, pacing, pitch, format])
-
   const handleSaveToHistory = useCallback(async () => {
     if (!audioBuffer && !audioBlob) return
     if (!hasFeat('history')) { toast.error('History is not available on your plan.'); onPlans(); return }
@@ -1061,6 +1037,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         speed: pacing,
         pitch,
       })
+      setSavedToHistory(true)
       toast.success('Saved to history!')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Save failed.')
@@ -1069,6 +1046,36 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [audioBuffer, audioBlob, pacing, pitch, text, accent, perfStyle, format, hasFeat, onPlans])
+
+  const handleRenderAndDownload = useCallback(async () => {
+    if (!audioBuffer && !audioBlob) return
+    setIsRendering(true)
+    try {
+      let blob: Blob
+      if (audioBuffer && (pacing !== 1.0 || pitch !== 0)) {
+        blob = await renderAudio(audioBuffer, pacing, pitch)
+      } else {
+        blob = audioBlob!
+      }
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `voicera-output-${pacing.toFixed(2)}x-${pitch >= 0 ? '+' : ''}${pitch}st.wav`
+      a.click()
+      // Auto-save to history if not already saved
+      if (hasFeat('history') && !savedToHistory) {
+        void handleSaveToHistory()
+      }
+    } catch {
+      toast.error('Render failed. Try downloading the raw audio.')
+      const a = document.createElement('a')
+      a.href = audioUrl ?? URL.createObjectURL(audioBlob!)
+      a.download = `voicera-output.${format}`
+      a.click()
+    } finally {
+      setIsRendering(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [audioBuffer, audioBlob, audioUrl, pacing, pitch, format, hasFeat, savedToHistory, handleSaveToHistory])
 
 
 
@@ -1287,7 +1294,9 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         />
 
         <div className="flex items-center justify-between -mt-1">
-          <span className="text-xs tabular-nums studio-char-count">{charsUsed} / {sc.maxChars.toLocaleString()} characters</span>
+          <span className={`text-xs tabular-nums studio-char-count${charsUsed > (usage?.charLimit ?? sc.maxChars) ? ' text-red-500' : ''}`}>
+            {charsUsed.toLocaleString()} / {(usage?.charLimit ?? sc.maxChars).toLocaleString()} characters
+          </span>
           <button type="button" onClick={() => setText('')} className="text-xs flex items-center gap-1 transition-colors studio-clear-btn">
             <X size={11} /> Clear Script
           </button>
@@ -1303,9 +1312,9 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           )}
         </AnimatePresence>
 
-        <button type="button" disabled={!text.trim() || status === 'loading'}
+        <button type="button" disabled={!text.trim() || status === 'loading' || charsUsed > (usage?.charLimit ?? sc.maxChars)}
           onClick={() => { void handleSynthesize() }}
-          className={`w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all studio-synth-btn${!text.trim() || status === 'loading' ? ' disabled' : ''}`}>
+          className={`w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all studio-synth-btn${!text.trim() || status === 'loading' || charsUsed > (usage?.charLimit ?? sc.maxChars) ? ' disabled' : ''}`}>
           {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <AudioWaveform size={18} />}
           {status === 'loading' ? 'Synthesizing Master Audio…' : 'Synthesize Studio Audio'}
         </button>
@@ -1379,7 +1388,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
                   onClick={isPreviewing ? handleStopPreview : handlePreview}
                   disabled={!audioBuffer}
                   className="flex-1 min-w-[80px] rounded-xl py-2.5 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all studio-play-btn">
-                  {isPreviewing ? <><Square size={11} fill="currentColor" /> Stop</> : <><Play size={12} fill="currentColor" /> Preview</>}
+                  {isPreviewing ? <><Square size={11} fill="currentColor" /> Stop</> : <><Play size={12} fill="currentColor" /> Play</>}
                 </button>
 
                 {/* Save to History */}
@@ -1400,7 +1409,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
               </div>
 
               <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                Adjust speed &amp; pitch above, then Preview to hear them, then Save or Download to keep.
+                Adjust speed &amp; pitch above, then Play to hear them, then Save or Download to keep.
               </p>
             </motion.div>
           )}
