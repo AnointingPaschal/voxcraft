@@ -111,10 +111,10 @@ const DEFAULT_PLANS: Plan[] = [
     enabledFeatures: ['accent_nigerian_pidgin', 'accent_nigerian_std', 'accent_lagos_exec', 'accent_ghanaian', 'accent_kenyan', 'accent_south_african', 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'perf_style', 'download_audio', 'vocal_cues'] },
   { id: 'pro',        name: 'Pro',        price: 15, tokensPerDay: 25000,  tokenPeriod: 'month', historyRetentionDays: 30, popular: true,
     features: ['25,000 chars/month', 'All accents', 'MP3 + WAV', 'Voice cloning', 'Priority queue', '30-day history'],
-    enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'priority_queue', 'download_audio', 'history'] },
+    enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'speed_control', 'pitch_control', 'priority_queue', 'download_audio', 'history'] },
   { id: 'enterprise', name: 'Enterprise', price: 49, tokensPerDay: 200000, tokenPeriod: 'month', historyRetentionDays: 90, popular: false,
     features: ['200,000 chars/month', 'All accents', 'All formats', 'Unlimited cloning', '90-day history', 'API access'],
-    enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'priority_queue', 'batch_synthesis', 'download_audio', 'history', 'api_access'] },
+    enabledFeatures: [...ALL_ACCENTS, 'format_mp3', 'format_wav', 'voice_clone', 'voice_library', 'vocal_cues', 'script_templates', 'perf_style', 'pacing_control', 'speed_control', 'pitch_control', 'priority_queue', 'batch_synthesis', 'download_audio', 'history', 'api_access'] },
 ]
 
 export async function getPlans(env: Env): Promise<Plan[]> {

@@ -53,6 +53,8 @@ export const PLATFORM_FEATURES = [
   { id: 'script_templates',  accentKey: '', category: 'Script Editor',  label: 'Script Templates',           description: 'Pidgin Broadcast, Documentary, Executive' },
   { id: 'perf_style',        accentKey: '', category: 'Performance',    label: 'Performance Style Picker',   description: 'Conversational, Dramatic, Newscaster etc.' },
   { id: 'pacing_control',    accentKey: '', category: 'Performance',    label: 'Pacing / Speed Control',     description: 'Adjust speech rate 0.5×–2×' },
+  { id: 'speed_control',     accentKey: '', category: 'Performance',    label: 'Advanced Speed Control',      description: 'Bake generation speed into the synthesized audio (0.5×–2×)' },
+  { id: 'pitch_control',     accentKey: '', category: 'Performance',    label: 'Voice Pitch Shifting',        description: 'Shift voice pitch up/down in semitones (−12 to +12)' },
   { id: 'priority_queue',    accentKey: '', category: 'Quality',        label: 'Priority Processing Queue',  description: 'Jobs processed first' },
   { id: 'batch_synthesis',   accentKey: '', category: 'Quality',        label: 'Batch Synthesis',            description: 'Submit multiple scripts at once' },
   { id: 'download_audio',    accentKey: '', category: 'Downloads',      label: 'Audio Download',             description: 'Download the generated MP3/WAV file' },

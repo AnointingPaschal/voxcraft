@@ -803,6 +803,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [_timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
   const [pacing, setPacing] = useState(1.0)
+  const [pitch, setPitch] = useState(0)  // semitones: -12 to +12
   const [format, setFormat] = useState('mp3')
   const [text, setText] = useState('')
   const [referenceFile, setReferenceFile] = useState<File | null>(null)
@@ -845,11 +846,19 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   // Feature gate helper — returns true when the user's plan has the feature enabled
   const hasFeat = (id: string) => (usage?.enabledFeatures ?? []).includes(id as never)
 
-  // Filter accents to only those enabled for the user's plan
+  // Filter accents to only those enabled for the user's plan — hidden entirely, not just locked
   const ACCENT_OPTIONS = sc.accentOptions.filter(a => {
     const fid = ACCENT_KEY_TO_FEATURE[a.label]
     return !fid || hasFeat(fid)
   })
+
+  // If the currently-selected accent was filtered out, silently switch to the first available
+  useEffect(() => {
+    if (!usage) return // wait until features are loaded
+    const valid = ACCENT_OPTIONS.find(a => a.label === accent?.label || a.value === accent?.value)
+    if (!valid && ACCENT_OPTIONS.length > 0) setAccent(ACCENT_OPTIONS[0])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usage])
 
   const startProgressTimer = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -931,7 +940,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         text: text.trim(),            // ONLY the user's script — nothing prepended
         format,
         accentInstruction: accentInstruction || undefined,
-        speed: pacing,               // API-level speed param
+        speed: pacing,
+        pitch,
         gender: undefined,
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
       })
@@ -1020,31 +1030,125 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           </>
         ) : null}
 
-        {/* Speed / Pacing control — generation speed gated by pacing_control feature */}
-        <div>
-          <div className="flex items-center justify-between mb-1.5">
+        {/* ── Advanced Speed Control ────────────────────────────────────── */}
+        <div className="studio-voice-control-block">
+          <div className="flex items-center justify-between mb-2">
             <FieldLabel>
               Speech Speed
-              {!hasFeat('pacing_control') && (
-                <span className="ml-2 text-xs font-normal opacity-60">(playback only — <button type="button" className="underline" onClick={onPlans}>upgrade</button> for generation speed)</span>
+              {!hasFeat('speed_control') && (
+                <button type="button" className="studio-lock-pill ml-2" onClick={onPlans}>
+                  <Lock size={8} /> Unlock generation speed
+                </button>
               )}
             </FieldLabel>
-            <span className="text-xs font-mono font-semibold tabular-nums" style={{ color: 'var(--accent)' }}>
-              {pacing.toFixed(2)}×
-            </span>
+            <div className="flex items-center gap-1.5">
+              <button type="button" className="studio-preset-btn" onClick={() => setPacing(0.75)}>Slow</button>
+              <button type="button" className="studio-preset-btn" onClick={() => setPacing(1.0)}>Normal</button>
+              <button type="button" className="studio-preset-btn" onClick={() => setPacing(1.25)}>Fast</button>
+              <span className="text-xs font-mono font-bold tabular-nums min-w-[3rem] text-right" style={{ color: 'var(--accent)' }}>
+                {pacing.toFixed(2)}×
+              </span>
+            </div>
           </div>
-          <input
-            type="range"
-            min="0.5" max="2.0" step="0.05"
-            value={pacing}
+          <input type="range" min="0.5" max="2.0" step="0.05" value={pacing}
             onChange={e => setPacing(parseFloat(e.target.value))}
-            className="w-full studio-speed-slider"
-          />
-          <div className="flex justify-between text-xs mt-1" style={{ color: 'var(--muted)' }}>
-            <span>0.5× Slow</span>
-            <span>1.0× Normal</span>
-            <span>2.0× Fast</span>
+            className="w-full studio-speed-slider" />
+          <div className="studio-slider-ticks">
+            {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map(v => (
+              <button key={v} type="button" className={`studio-tick-btn ${pacing === v ? 'active' : ''}`}
+                onClick={() => setPacing(v)}>{v}×</button>
+            ))}
           </div>
+          {/* Fine-tune nudge buttons */}
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex gap-1">
+              {[-0.1, -0.05].map(d => (
+                <button key={d} type="button" className="studio-nudge-btn"
+                  onClick={() => setPacing(p => Math.max(0.5, Math.round((p + d) * 100) / 100))}>
+                  {d > 0 ? '+' : ''}{d}×
+                </button>
+              ))}
+            </div>
+            <button type="button" className="studio-nudge-btn studio-nudge-reset"
+              onClick={() => setPacing(1.0)}>Reset</button>
+            <div className="flex gap-1">
+              {[0.05, 0.1].map(d => (
+                <button key={d} type="button" className="studio-nudge-btn"
+                  onClick={() => setPacing(p => Math.min(2.0, Math.round((p + d) * 100) / 100))}>
+                  +{d}×
+                </button>
+              ))}
+            </div>
+          </div>
+          {!hasFeat('speed_control') && (
+            <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>
+              Playback speed only. <button type="button" className="underline" onClick={onPlans}>Upgrade</button> to bake speed into the generated audio.
+            </p>
+          )}
+        </div>
+
+        {/* ── Pitch Control ─────────────────────────────────────────────── */}
+        <div className="studio-voice-control-block">
+          <div className="flex items-center justify-between mb-2">
+            <FieldLabel>
+              Voice Pitch
+              {!hasFeat('pitch_control') && (
+                <button type="button" className="studio-lock-pill ml-2" onClick={onPlans}>
+                  <Lock size={8} /> Upgrade to unlock
+                </button>
+              )}
+            </FieldLabel>
+            <div className="flex items-center gap-1.5">
+              <button type="button" className="studio-preset-btn" onClick={() => setPitch(-4)}>Deep</button>
+              <button type="button" className="studio-preset-btn" onClick={() => setPitch(0)}>Natural</button>
+              <button type="button" className="studio-preset-btn" onClick={() => setPitch(4)}>High</button>
+              <span className={`text-xs font-mono font-bold tabular-nums min-w-[3.5rem] text-right ${pitch === 0 ? '' : pitch > 0 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                {pitch === 0 ? '±0 st' : `${pitch > 0 ? '+' : ''}${pitch} st`}
+              </span>
+            </div>
+          </div>
+          <input type="range" min="-12" max="12" step="1" value={pitch}
+            onChange={e => setPitch(parseInt(e.target.value))}
+            disabled={!hasFeat('pitch_control')}
+            className={`w-full studio-pitch-slider ${!hasFeat('pitch_control') ? 'opacity-40 cursor-not-allowed' : ''}`} />
+          <div className="studio-slider-ticks">
+            {[-12, -8, -4, 0, 4, 8, 12].map(v => (
+              <button key={v} type="button"
+                className={`studio-tick-btn ${pitch === v ? 'active' : ''} ${!hasFeat('pitch_control') ? 'opacity-40 cursor-not-allowed' : ''}`}
+                disabled={!hasFeat('pitch_control')}
+                onClick={() => hasFeat('pitch_control') && setPitch(v)}>
+                {v > 0 ? `+${v}` : v}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <div className="flex gap-1">
+              {[-2, -1].map(d => (
+                <button key={d} type="button" className="studio-nudge-btn"
+                  disabled={!hasFeat('pitch_control')}
+                  onClick={() => hasFeat('pitch_control') && setPitch(p => Math.max(-12, p + d))}>
+                  {d} st
+                </button>
+              ))}
+            </div>
+            <button type="button" className="studio-nudge-btn studio-nudge-reset"
+              disabled={!hasFeat('pitch_control')}
+              onClick={() => hasFeat('pitch_control') && setPitch(0)}>Reset</button>
+            <div className="flex gap-1">
+              {[1, 2].map(d => (
+                <button key={d} type="button" className="studio-nudge-btn"
+                  disabled={!hasFeat('pitch_control')}
+                  onClick={() => hasFeat('pitch_control') && setPitch(p => Math.min(12, p + d))}>
+                  +{d} st
+                </button>
+              ))}
+            </div>
+          </div>
+          {!hasFeat('pitch_control') && (
+            <p className="text-xs mt-1.5" style={{ color: 'var(--muted)' }}>
+              Voice pitch shifting requires a Starter plan or higher. <button type="button" className="underline" onClick={onPlans}>Upgrade</button>
+            </p>
+          )}
         </div>
 
         <div className="flex items-end gap-4">

@@ -122,8 +122,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const user = await requireAuth(env, req)
     if (!user) return e('Please sign in to use Voicera.', 401)
 
-    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number }
-    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed } = body
+    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number }
+    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch } = body
     if (!text?.trim()) return e('Please enter a script to synthesize.')
 
     // ── Feature gate checks ──────────────────────────────────────────────────
@@ -167,9 +167,13 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       input: styledInput,
       response_format: format,
     }
-    // Speed param — only applied at generation time when plan enables pacing_control
-    if (hasFx('pacing_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
+    // Speed — baked into audio only when plan enables speed_control
+    if (hasFx('speed_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
       payload.speed = Math.round(speed * 100) / 100
+    }
+    // Pitch shifting — only when plan enables pitch_control
+    if (hasFx('pitch_control') && typeof pitch === 'number' && pitch !== 0 && pitch >= -12 && pitch <= 12) {
+      payload.pitch = pitch
     }
     if (referenceAudioDataUrl) {
       const refs: unknown[] = [{ type: 'input_audio', input_audio: { data: referenceAudioDataUrl } }]

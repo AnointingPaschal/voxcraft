@@ -352,6 +352,90 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
 }
 .studio-usage-track { background:color-mix(in srgb,var(--ink,#f0faf7) 8%,transparent); }
 
+/* Voice control block wrapper */
+.studio-voice-control-block {
+  padding: 0.875rem 1rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--ink, #f0faf7) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 8%, transparent);
+}
+
+/* Preset speed/pitch buttons */
+.studio-preset-btn {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent);
+  background: color-mix(in srgb, var(--ink, #f0faf7) 6%, transparent);
+  color: color-mix(in srgb, var(--ink, #f0faf7) 60%, transparent);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.studio-preset-btn:hover {
+  background: color-mix(in srgb, var(--accent, #20d2a0) 15%, transparent);
+  color: var(--accent, #20d2a0);
+  border-color: var(--accent, #20d2a0);
+}
+
+/* Tick row under sliders */
+.studio-slider-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.studio-tick-btn {
+  font-size: 0.6rem;
+  color: color-mix(in srgb, var(--ink, #f0faf7) 35%, transparent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.1s;
+}
+.studio-tick-btn:hover, .studio-tick-btn.active {
+  color: var(--accent, #20d2a0);
+  font-weight: 700;
+}
+
+/* Fine-tune nudge buttons */
+.studio-nudge-btn {
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.18rem 0.45rem;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--ink, #f0faf7) 10%, transparent);
+  background: color-mix(in srgb, var(--ink, #f0faf7) 5%, transparent);
+  color: color-mix(in srgb, var(--ink, #f0faf7) 55%, transparent);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.studio-nudge-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, #20d2a0) 12%, transparent);
+  color: var(--accent, #20d2a0);
+}
+.studio-nudge-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.studio-nudge-reset {
+  background: color-mix(in srgb, var(--ink, #f0faf7) 8%, transparent);
+  font-size: 0.6rem;
+}
+
+/* Lock pill upgrade badge */
+.studio-lock-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.6rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #20d2a0) 10%, transparent);
+  color: var(--accent, #20d2a0);
+  border: 1px solid color-mix(in srgb, var(--accent, #20d2a0) 25%, transparent);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* Speech Speed slider */
 .studio-speed-slider {
   -webkit-appearance: none;
@@ -386,6 +470,45 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
   height: 16px;
   border-radius: 50%;
   background: var(--accent, #20d2a0);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+
+/* Pitch slider — purple/violet accent to distinguish from green speed */
+.studio-pitch-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent) 0%,
+    color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent) 50%,
+    color-mix(in srgb, var(--ink, #f0faf7) 12%, transparent) 100%
+  );
+  accent-color: #a78bfa;
+}
+.studio-pitch-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #a78bfa;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+  transition: transform 0.1s;
+}
+.studio-pitch-slider::-webkit-slider-thumb:active { transform: scale(1.25); }
+.studio-pitch-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #a78bfa;
   cursor: pointer;
   border: none;
   box-shadow: 0 1px 4px rgba(0,0,0,0.25);
