@@ -1353,3 +1353,146 @@ html { background: var(--site-bg, var(--page, #f4f6f1)); }
   color: #d97706;
   text-decoration: underline;
 }
+
+/* ── Voice Picker ────────────────────────────────────────────────── */
+.voice-picker-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+}
+.voice-picker-bar:hover { background: var(--hover); }
+.voice-picker-bar-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px; color: #fff;
+  border: 2px solid var(--accent);
+}
+.voice-picker-bar-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.voice-picker-bar-info { flex: 1; min-width: 0; }
+.voice-picker-bar-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.voice-picker-bar-name { font-size: 15px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.voice-picker-bar-btn {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.voice-picker-bar-btn:hover { border-color: var(--accent); }
+
+/* sheet */
+.voice-picker-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: flex-end; justify-content: center;
+  animation: vp-fadein .15s ease;
+}
+@keyframes vp-fadein { from { opacity: 0 } to { opacity: 1 } }
+.voice-picker-sheet {
+  width: 100%; max-width: 520px;
+  max-height: 88vh;
+  background: var(--card);
+  border-radius: 24px 24px 0 0;
+  padding: 0 0 env(safe-area-inset-bottom, 16px);
+  display: flex; flex-direction: column;
+  animation: vp-slidein .2s cubic-bezier(.22,1,.36,1);
+}
+@keyframes vp-slidein { from { transform: translateY(60px); opacity: 0 } to { transform: none; opacity: 1 } }
+.voice-picker-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border); margin: 10px auto 0;
+  flex-shrink: 0;
+}
+.voice-picker-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 16px 20px 8px; flex-shrink: 0;
+}
+.voice-picker-title { font-size: 18px; font-weight: 800; color: var(--text); }
+.voice-picker-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.voice-picker-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--hover); color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.voice-picker-close:hover { background: var(--border); color: var(--text); }
+.voice-picker-filters {
+  display: flex; gap: 8px; padding: 0 20px 12px; flex-shrink: 0;
+}
+.voice-picker-filter-btn {
+  padding: 7px 18px; border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+  border: 1.5px solid var(--border);
+  background: transparent; color: var(--muted);
+  transition: all 0.15s;
+}
+.voice-picker-filter-btn.active {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.voice-picker-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; padding: 0 16px 20px;
+  overflow-y: auto; flex: 1;
+}
+.voice-picker-card {
+  display: flex; flex-direction: column; align-items: center;
+  padding: 16px 10px 12px;
+  border-radius: 16px;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  gap: 6px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  text-align: center;
+}
+.voice-picker-card:hover { border-color: var(--accent); background: var(--hover); }
+.voice-picker-card.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg));
+}
+.voice-picker-avatar {
+  position: relative;
+  width: 60px; height: 60px;
+  border-radius: 50%; overflow: hidden;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 18px; color: #fff;
+  border: 2.5px solid var(--border);
+  flex-shrink: 0;
+}
+.voice-picker-card.selected .voice-picker-avatar { border-color: var(--accent); }
+.voice-picker-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.voice-picker-avatar-check {
+  position: absolute; bottom: 0; right: 0;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  font-size: 10px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--card);
+}
+.voice-picker-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.voice-picker-desc { font-size: 11px; color: var(--muted); line-height: 1.3; }
+.voice-picker-listen {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 999px;
+  background: var(--accent); color: #fff;
+  font-size: 11px; font-weight: 700;
+  margin-top: 2px; cursor: pointer;
+  transition: opacity 0.15s;
+}
+.voice-picker-listen:hover { opacity: .85; }
+.voice-picker-listen.playing { background: var(--muted); }
+.voice-picker-empty { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 0; }

@@ -721,6 +721,8 @@ function VoiceSamplesTab() {
   const [refDataUrl, setRefDataUrl] = useState('')
   const [refFileName, setRefFileName] = useState('')
   const [refTranscript, setRefTranscript] = useState('')
+  const [avatarDataUrl, setAvatarDataUrl] = useState('')
+  const [avatarFileName, setAvatarFileName] = useState('')
 
   // Step 2 — script + generation settings
   const [script, setScript] = useState('Hello, and thank you for listening. I am recording this audio snippet to help train a natural-sounding AI voice clone. It is important to speak clearly, maintain a steady rhythm, and avoid rushing through the sentences.')
@@ -800,12 +802,14 @@ function VoiceSamplesTab() {
         accent: accentLabel,
         description: description.trim() || `${genGender} · ${genStyle}`,
         audioDataUrl: dataUrl,
+        imageDataUrl: avatarDataUrl || undefined,
         updatedAt: Date.now(),
         gender: genGender === 'Male' ? 'male' : genGender === 'Female' ? 'female' : (gender ?? 'neutral'),
       }
       void saveVoices([...voices, voice]).then(ok => {
         if (ok) {
           setVoiceName(''); setScript(''); setRefDataUrl(''); setRefFileName(''); setRefTranscript('')
+          setAvatarDataUrl(''); setAvatarFileName('')
           setGenAudioUrl(null); setGenAudioBlob(null); setGenStatus('idle')
         }
       })
@@ -838,6 +842,27 @@ function VoiceSamplesTab() {
           <Field label="Accent / style label"><AInput value={accentLabel} onChange={setAccentLabel} placeholder="Lagos English, warm" /></Field>
           <Field label="Short description (optional)"><AInput value={description} onChange={setDescription} placeholder="Clear, friendly narration" /></Field>
         </div>
+
+        {/* Avatar photo */}
+        <Field label="Avatar photo (optional — shown in voice picker)">
+          <label className="adm-upload-zone flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm cursor-pointer">
+            <Upload size={15} />
+            {avatarFileName
+              ? <span className="flex items-center gap-2">
+                  <img src={avatarDataUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
+                  {avatarFileName}
+                </span>
+              : 'Choose a photo (JPG/PNG, max 1 MB)'}
+            <input type="file" accept="image/*" className="hidden" onChange={e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              if (file.size > 1_048_576) { return }
+              const reader = new FileReader()
+              reader.onload = () => { setAvatarDataUrl(reader.result as string); setAvatarFileName(file.name) }
+              reader.readAsDataURL(file)
+            }} />
+          </label>
+        </Field>
 
         {/* Step 2 — Reference sample for cloning */}
         <div className="adm-step-label">② Upload reference audio to clone <span className="adm-dim font-normal">(optional but recommended)</span></div>
@@ -904,8 +929,10 @@ function VoiceSamplesTab() {
         {voices.map(voice => (
           <div key={voice.id} className="adm-card rounded-2xl p-4 flex flex-col gap-3">
             <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center adm-metric-icon">
-                <AudioWaveform size={18} className="adm-accent" />
+              <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 flex items-center justify-center adm-metric-icon">
+                {voice.imageDataUrl
+                  ? <img src={voice.imageDataUrl} alt={voice.name} className="w-full h-full object-cover" />
+                  : <AudioWaveform size={18} className="adm-accent" />}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-semibold text-sm adm-text">{voice.name}</div>

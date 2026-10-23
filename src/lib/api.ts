@@ -80,8 +80,9 @@ export interface VoiceSample {
   accent: string
   description: string
   audioDataUrl: string
+  imageDataUrl?: string       // optional avatar photo uploaded by admin
   updatedAt: number
-  gender?: 'male' | 'female' | 'neutral'  // gender of the voice preset
+  gender?: 'male' | 'female' | 'neutral'
 }
 
 // Studio configuration managed by the admin

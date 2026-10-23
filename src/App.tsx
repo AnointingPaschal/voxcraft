@@ -1,8 +1,9 @@
-import { useState, useRef, useCallback, useEffect, type JSX } from 'react'
+import { useState, useRef, useCallback, useEffect, lazy, Suspense, type JSX } from 'react'
 import type React from 'react'
+const VoicePicker = lazy(() => import('./components/VoicePicker'))
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Mic, Upload, FileText, Wand2, Play, Square, Download, Loader2, MessageSquareText,
+  Mic, Upload, FileText, Wand2, Play, Square, Download, Loader2,
   ChevronDown, X, AlertCircle, CheckCircle2, Sparkles, AudioWaveform,
   Globe, Zap, LogOut, Crown, ShieldCheck, User as UserIcon, Menu, Lock, History,
   Phone, MapPin, Twitter, Instagram, Linkedin, MessageCircle, Mail,
@@ -803,7 +804,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
   const [voices, setVoices] = useState<VoiceSample[]>([])
   const [selectedVoice, setSelectedVoice] = useState<VoiceSample | null>(null)
   const [_selectedVoiceId, setSelectedVoiceId] = useState('')
-  const [scriptMode, setScriptMode] = useState<'narration' | 'conversation'>('narration')
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [scriptMode, _setScriptMode] = useState<'narration' | 'conversation'>('narration')
   const [_timbre] = useState<Timbre>('Auto / Match')
   const [perfStyle, setPerfStyle] = useState(PERF_STYLES[0] ?? '')
   const [pacing, setPacing] = useState(1.0)
@@ -1120,56 +1122,31 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         </div>
       )}
 
-      <Section title="Vocal Profile & Regional Accent" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
-        <div className="flex items-center justify-between mb-1">
-          <FieldLabel>Voice</FieldLabel>
-          {voices.length > 0 && allowedIds.length > 0 && voices.length > VOICE_OPTIONS.length && (
-            <button type="button" onClick={onPlans}
-              className="text-xs flex items-center gap-1 studio-gate-upgrade">
-              <Lock size={10} /> {voices.length - VOICE_OPTIONS.length} locked
-            </button>
-          )}
-        </div>
-
-        {voices.length > 0 ? (
-          /* ── Admin voices are the voice selector ── */
-          <SelectField
-            value={selectedVoice?.id ?? ''}
-            onChange={v => {
-              const voice = VOICE_OPTIONS.find(vx => vx.id === v)
-              if (!voice) return
-              setSelectedVoice(voice)
-              setSelectedVoiceId(voice.id)
-              setReferenceDataUrl(voice.audioDataUrl)
-              setReferenceTranscript('')
-            }}
-            options={VOICE_OPTIONS.map(v => ({
-              label: `${v.name}${v.gender ? ` (${v.gender})` : ''}`,
-              value: v.id,
-            }))}
-          />
+      <Section title="Vocal Profile" className="profile-section" icon={<UserIcon size={14} className="section-icon" />}>
+        {/* ── Voice bar ── */}
+        {VOICE_OPTIONS.length > 0 ? (
+          <button type="button" className="voice-picker-bar w-full" onClick={() => setPickerOpen(true)}>
+            <div className="voice-picker-bar-avatar">
+              {selectedVoice?.imageDataUrl
+                ? <img src={selectedVoice.imageDataUrl} alt={selectedVoice.name} />
+                : <span>{selectedVoice ? selectedVoice.name.slice(0, 2).toUpperCase() : '?'}</span>
+              }
+            </div>
+            <div className="voice-picker-bar-info">
+              <div className="voice-picker-bar-label">Voice</div>
+              <div className="voice-picker-bar-name">
+                {selectedVoice ? selectedVoice.name : 'No voice selected'}
+              </div>
+            </div>
+            <span className="voice-picker-bar-btn">
+              Choose a voice <ChevronDown size={14} />
+            </span>
+          </button>
         ) : (
-          /* ── Fallback: legacy accent list when no voices uploaded ── */
-          <>
-            {sc.accentOptions.length > ACCENT_OPTIONS.length && (
-              <button type="button" onClick={onPlans}
-                className="text-xs flex items-center gap-1 studio-gate-upgrade mb-1">
-                <Lock size={10} /> {sc.accentOptions.length - ACCENT_OPTIONS.length} locked
-              </button>
-            )}
-            <SelectField value={accent.label} onChange={v => {
-              const chosen = ACCENT_OPTIONS.find(a => a.label === v) ?? ACCENT_OPTIONS[0]
-              if (chosen) setAccent(chosen)
-            }} options={ACCENT_OPTIONS.map(a => ({ label: a.label, value: a.label }))} />
-          </>
+          <p className="text-xs text-center py-4" style={{ color: 'var(--muted)' }}>
+            No voices uploaded yet. Add voices in Admin → Voice Library.
+          </p>
         )}
-
-        {hasFeat('perf_style') ? (
-          <>
-            <FieldLabel>Performance Style</FieldLabel>
-            <SelectField value={perfStyle} onChange={setPerfStyle} options={PERF_STYLES.map(s => ({ label: s, value: s }))} />
-          </>
-        ) : null}
 
         {/* ── Speech Speed: slider + −/+ buttons ───────────────────────── */}
         <div>
@@ -1309,22 +1286,11 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       </Section>}
 
       <Section title="Studio Script Editor" className="script-section" icon={<FileText size={14} className="section-icon" />}>
-        <div className="mode-switch">
-          <button type="button" className={scriptMode === 'narration' ? 'active' : ''} onClick={() => setScriptMode('narration')}><FileText size={13} /> Narration</button>
-          <button type="button" className={scriptMode === 'conversation' ? 'active' : ''} onClick={() => setScriptMode('conversation')}><MessageSquareText size={13} /> Conversation</button>
-        </div>
-        {scriptMode === 'conversation' && (
-          <div className="dialogue-hint">
-            Write one turn per line. Example: <b>Speaker A:</b> Hello there!<br /><b>Speaker B:</b> Good to see you.
-          </div>
-        )}
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
           maxLength={sc.maxChars}
-          placeholder={scriptMode === 'conversation'
-            ? 'Speaker A: How are you today?\nSpeaker B: I am doing well, thank you.'
-            : 'Type or paste your script here…'}
+          placeholder="Type or paste your script here…"
           rows={8}
           className="w-full rounded-2xl px-4 py-3 text-sm outline-none studio-textarea"
           onFocus={e => e.currentTarget.classList.add('focused')}
@@ -1463,6 +1429,23 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           </div>
         )}
       </Section>
+
+      {/* ── Voice picker modal ─────────────────────────────────────────── */}
+      {pickerOpen && (
+        <Suspense fallback={null}>
+          <VoicePicker
+            voices={VOICE_OPTIONS}
+            selected={selectedVoice}
+            onSelect={v => {
+              setSelectedVoice(v)
+              setSelectedVoiceId(v.id)
+              setReferenceDataUrl(v.audioDataUrl)
+              setReferenceTranscript('')
+            }}
+            onClose={() => setPickerOpen(false)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
