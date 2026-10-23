@@ -208,8 +208,9 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
         ...(typeof gender === 'string' && gender ? [`Use a ${gender} voice.`] : []),
       ].join(' '),
       // Lower temperature = more consistent, deliberate delivery
+      // (overridden to 0.3 below when reference audio cloning is active)
       temperature: 0.5,
-      repetition_penalty: 1.2,
+      repetition_penalty: 1.3,
     }
     // Speed — baked into audio only when plan enables speed_control
     if (hasFx('speed_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
@@ -223,6 +224,21 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       const refs: unknown[] = [{ type: 'input_audio', input_audio: { data: referenceAudioDataUrl } }]
       if (referenceTranscript?.trim()) refs.push({ type: 'text', text: referenceTranscript.trim() })
       payload.input_references = refs
+      // When cloning from reference audio Fish Audio is in voice-matching mode and
+      // may suppress inline [break] cues. Use provider.options to pass Fish-native
+      // parameters that work even in cloning mode:
+      //   chunk_length: 100 — small segments force sentence-boundary splits
+      //   normalize: true   — spoken-word normalisation for numbers/symbols
+      payload.provider = {
+        options: {
+          'fish-audio': {
+            chunk_length: 100,
+            normalize: true,
+          },
+        },
+      }
+      // More deterministic in cloning mode — helps the model follow pause markers
+      payload.temperature = 0.3
     }
 
     const orHeaders = {
