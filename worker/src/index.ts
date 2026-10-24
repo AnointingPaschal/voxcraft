@@ -167,8 +167,10 @@ export default {
         console.error(`[Voicera] Attempt 1 failed (${upstream.status}):`, errText)
         // Only retry on transient errors (5xx / 429); auth/quota failures are permanent
         if (![429, 500, 502, 503, 504].includes(upstream.status)) {
-          let friendly = 'Voice engine is busy. Please try again in a few seconds.'
-          if ([401, 402, 403].includes(upstream.status)) friendly = 'Voice engine quota exceeded. Please contact admin.'
+          let orError = ''
+          try { orError = JSON.parse(errText)?.error?.message ?? errText } catch { orError = errText }
+          let friendly = `Voice engine error (${upstream.status}): ${orError}`
+          if ([401, 402, 403].includes(upstream.status)) friendly = `Voice engine auth error: ${orError}`
           return e(friendly, upstream.status)
         }
         await new Promise(r => setTimeout(r, 2000))
@@ -179,9 +181,12 @@ export default {
         if (!upstream.ok) {
           const errText2 = await upstream.text()
           console.error(`[Voicera] Attempt 2 failed (${upstream.status}):`, errText2)
-          let friendly = 'Voice engine is busy. Please try again in a few seconds.'
-          if (upstream.status === 429) friendly = 'Rate limit reached. Please wait 15 seconds and try again.'
-          else if ([401, 402, 403].includes(upstream.status)) friendly = 'Voice engine quota exceeded. Please contact admin.'
+          // Surface the raw OpenRouter error so the client can see what's actually failing
+          let orError = ''
+          try { orError = JSON.parse(errText2)?.error?.message ?? errText2 } catch { orError = errText2 }
+          let friendly = `Voice engine error (${upstream.status}): ${orError}`
+          if (upstream.status === 429) friendly = `Rate limit reached — ${orError}`
+          else if ([401, 402, 403].includes(upstream.status)) friendly = `Voice engine auth error: ${orError}`
           return e(friendly, upstream.status)
         }
       }
