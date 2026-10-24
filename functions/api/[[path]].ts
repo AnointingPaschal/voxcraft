@@ -207,8 +207,10 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
         ? { instructions: `Use a ${gender} voice.` }
         : {}),
     }
-    // Speed — baked into audio only when plan enables speed_control
-    if (hasFx('speed_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
+    // Speed — baked into audio only when plan enables speed_control AND no reference
+    // voice is in use. When cloning, speed distorts the reference voice; the client
+    // applies speed client-side via Web Audio playbackRate instead.
+    if (hasFx('speed_control') && !referenceAudioDataUrl && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
       payload.speed = Math.round(speed * 100) / 100
     }
     // Pitch shifting — only when plan enables pitch_control

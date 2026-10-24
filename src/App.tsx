@@ -971,11 +971,14 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         if (parts.length) accentInstruction = parts.join(' ')
       }
 
+      // When a reference voice is loaded, never send speed to the API —
+      // the model bakes speed into generation which distorts the cloned voice.
+      // Speed is applied client-side via Web Audio playbackRate instead.
       const { blob, remaining } = await synthesize({
         text: text.trim(),
         format,
         accentInstruction,
-        speed: pacing,
+        ...(referenceDataUrl ? {} : { speed: pacing }),
         pitch,
         ...(selectedVoice ? { voiceId: selectedVoice.id } : {}),
         ...(referenceDataUrl ? { referenceAudioDataUrl: referenceDataUrl, referenceTranscript } : {}),
