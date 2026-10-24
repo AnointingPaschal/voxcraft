@@ -169,25 +169,45 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const config = await getSiteConfig(env)
     if (!config.openrouterApiKey) return e('Voice engine not configured. Please contact admin.')
 
-    const styledInput = accentInstruction ? `[${accentInstruction}] ${text.trim()}` : text.trim()
+    // ── Delivery style tag ──────────────────────────────────────────────────
+    // Fish Audio S2.1 reads [bracket] cues as style/emotion directions, NOT spoken text.
+    // The `instructions` field is prepended by OpenRouter as "[instructions text]" which
+    // IS read aloud — so we use a single compact bracket tag in the input instead.
+    const perfStyleLower = (perfStyle ?? '').toLowerCase()
+    let styleTag = '[warm audiobook narrator, natural intonation, expressive storytelling]'
+    if (perfStyleLower.includes('storytelling') || perfStyleLower.includes('narrative')) {
+      styleTag = '[master storyteller, immersive, vivid, emotionally resonant, vary pace and pitch]'
+    } else if (perfStyleLower.includes('documentary')) {
+      styleTag = '[documentary narrator, authoritative, measured, each sentence lands with weight]'
+    } else if (perfStyleLower.includes('broadcast') || perfStyleLower.includes('authoritative')) {
+      styleTag = '[broadcast journalist, clear, confident, compelling delivery]'
+    } else if (perfStyleLower.includes('calm') || perfStyleLower.includes('soothing')) {
+      styleTag = '[calm, gentle, soothing, slow and soft, reassuring tone]'
+    } else if (perfStyleLower.includes('energetic') || perfStyleLower.includes('excited')) {
+      styleTag = '[high energy, enthusiastic, bright and upbeat, punch key words]'
+    } else if (perfStyleLower.includes('corporate') || perfStyleLower.includes('professional')) {
+      styleTag = '[professional corporate narrator, clear, polished, confident]'
+    } else if (perfStyleLower.includes('natural') || perfStyleLower.includes('conversational')) {
+      styleTag = '[natural conversational tone, friendly, relaxed, like talking to a friend]'
+    }
+
+    // Build the final input: style tag first, then the user's raw script
+    const baseText = text.trim()
+
     // ── Text pre-processing ─────────────────────────────────────────────────
     // 1. Normalise Unicode punctuation to ASCII equivalents
-    const normalised = styledInput
+    const normalised = baseText
       .replace(/[\u2018\u2019]/g, "'")
       .replace(/[\u201C\u201D]/g, '"')
       .replace(/\u2014|\u2013/g, ' — ')
       .replace(/\u2026/g, '...')
 
     // 2. Inject Fish Audio S2 pause markers.
-    //    normalize MUST be false for these to survive (set below).
-    //    Paragraph breaks → [long-break] between paragraphs
-    //    Sentence end (. ? !)  → [long-break]
-    //    Clause separator (, ; : —) → [break]
-    //    Ellipsis → [long-break]
-    const processedInput = normalised
-      // paragraph breaks (two or more newlines) — deep breath between paragraphs
+    //    normalize MUST be false for these to survive (set below in provider.options).
+    const processedScript = normalised
+      // paragraph breaks — deep breath between paragraphs
       .replace(/\n{2,}/g, ' [long-break] [long-break] ')
-      // single newlines — treat as sentence boundary
+      // single newlines — sentence boundary
       .replace(/\n/g, ' [long-break] ')
       // ellipsis — dramatic trailing pause
       .replace(/\.\.\.(\s*)/g, '... [long-break] ')
@@ -195,55 +215,19 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       .replace(/([.?!])(\s+|$)/g, '$1 [long-break] ')
       // clause separators
       .replace(/([,;:])(\s+)/g, '$1 [break] ')
-      // em dash — parenthetical pause on both sides
+      // em dash — parenthetical pause
       .replace(/ — /g, ' [break] — [break] ')
       // collapse multiple spaces
       .replace(/ {2,}/g, ' ')
       .trim()
 
-    // ── Delivery instructions ───────────────────────────────────────────────
-    // Fish Audio reads `instructions` as a voice-actor direction.
-    // Build a rich narrative instruction from the user's chosen performance style.
-    const perfStyleLower = (perfStyle ?? '').toLowerCase()
-    let baseInstruction = 'Speak as a professional audiobook narrator: warm, expressive, and engaging. '
-      + 'Use natural rising and falling intonation. '
-      + 'Breathe at every sentence boundary. '
-      + 'Slow down slightly before key moments for dramatic effect. '
-      + 'Honour every [break] and [long-break] pause marker in the text exactly as written.'
-
-    if (perfStyleLower.includes('storytelling') || perfStyleLower.includes('narrative')) {
-      baseInstruction = 'Speak as a master storyteller: immersive, vivid, and emotionally resonant. '
-        + 'Paint pictures with your voice — vary pace, pitch, and volume to bring the scene to life. '
-        + 'Use warm, intimate tone as if telling a bedtime story. '
-        + 'Breathe naturally between sentences. '
-        + 'Honour every [break] and [long-break] pause marker exactly as written.'
-    } else if (perfStyleLower.includes('documentary')) {
-      baseInstruction = 'Speak as a documentary narrator: authoritative, measured, and evocative. '
-        + 'Let each sentence land with weight. Pause meaningfully between ideas. '
-        + 'Honour every [break] and [long-break] pause marker exactly as written.'
-    } else if (perfStyleLower.includes('broadcast') || perfStyleLower.includes('authoritative')) {
-      baseInstruction = 'Speak as a broadcast journalist: clear, confident, and compelling. '
-        + 'Vary pace for emphasis. Pause between major points. '
-        + 'Honour every [break] and [long-break] pause marker exactly as written.'
-    } else if (perfStyleLower.includes('calm') || perfStyleLower.includes('soothing')) {
-      baseInstruction = 'Speak in a calm, gentle, and soothing tone: slow, soft, and reassuring. '
-        + 'Take your time between sentences. Breathe visibly. '
-        + 'Honour every [break] and [long-break] pause marker exactly as written.'
-    } else if (perfStyleLower.includes('energetic') || perfStyleLower.includes('excited')) {
-      baseInstruction = 'Speak with high energy and enthusiasm: bright, upbeat, and dynamic. '
-        + 'Punch key words. Keep momentum between sentences. '
-        + 'Honour every [break] and [long-break] pause marker exactly as written.'
-    }
-
-    if (typeof gender === 'string' && gender) {
-      baseInstruction = `Use a ${gender} voice. ` + baseInstruction
-    }
+    // Style tag goes first so Fish Audio adopts the delivery before speaking
+    const processedInput = `${styleTag} ${processedScript}`
 
     const payload: Record<string, unknown> = {
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
       input: processedInput,
       response_format: format,
-      instructions: baseInstruction,
     }
     // Speed — baked into audio only when plan enables speed_control AND no reference
     // voice is in use. When cloning, speed distorts the reference voice; the client
