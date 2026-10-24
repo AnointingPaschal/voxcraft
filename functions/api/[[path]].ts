@@ -122,8 +122,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const user = await requireAuth(env, req)
     if (!user) return e('Please sign in to use Voicera.', 401)
 
-    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number; voiceId?: string; gender?: string }
-    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch, voiceId, gender } = body
+    const body = await req.json() as { text?: string; accentInstruction?: string; format?: string; referenceAudioDataUrl?: string; referenceTranscript?: string; speed?: number; pitch?: number; voiceId?: string; gender?: string; perfStyle?: string }
+    const { text, accentInstruction, format = 'mp3', referenceAudioDataUrl, referenceTranscript, speed, pitch, voiceId, gender, perfStyle } = body
     if (!text?.trim()) return e('Please enter a script to synthesize.')
 
     // ── Feature gate checks ──────────────────────────────────────────────────
@@ -178,34 +178,72 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       .replace(/\u2014|\u2013/g, ' — ')
       .replace(/\u2026/g, '...')
 
-    // 2. Inject Fish Audio S2 pause markers at every punctuation boundary.
-    //    [break] = short pause (~300 ms), [long-break] = long pause (~600 ms).
-    //    Rules based on Fish Audio S2.1 documentation:
-    //      sentence end (. ? !)  → [long-break]
-    //      clause separator (, ; : —) → [break]
-    //      ellipsis (...)         → [long-break]
+    // 2. Inject Fish Audio S2 pause markers.
+    //    normalize MUST be false for these to survive (set below).
+    //    Paragraph breaks → [long-break] between paragraphs
+    //    Sentence end (. ? !)  → [long-break]
+    //    Clause separator (, ; : —) → [break]
+    //    Ellipsis → [long-break]
     const processedInput = normalised
-      // sentence-ending punctuation followed by whitespace or end-of-string
-      .replace(/([.?!])(\s+|$)/g, '$1 [long-break] ')
-      // ellipsis
+      // paragraph breaks (two or more newlines) — deep breath between paragraphs
+      .replace(/\n{2,}/g, ' [long-break] [long-break] ')
+      // single newlines — treat as sentence boundary
+      .replace(/\n/g, ' [long-break] ')
+      // ellipsis — dramatic trailing pause
       .replace(/\.\.\.(\s*)/g, '... [long-break] ')
+      // sentence-ending punctuation
+      .replace(/([.?!])(\s+|$)/g, '$1 [long-break] ')
       // clause separators
       .replace(/([,;:])(\s+)/g, '$1 [break] ')
-      // em dash used as a parenthetical break
+      // em dash — parenthetical pause on both sides
       .replace(/ — /g, ' [break] — [break] ')
-      // collapse any double spaces introduced above
+      // collapse multiple spaces
       .replace(/ {2,}/g, ' ')
       .trim()
+
+    // ── Delivery instructions ───────────────────────────────────────────────
+    // Fish Audio reads `instructions` as a voice-actor direction.
+    // Build a rich narrative instruction from the user's chosen performance style.
+    const perfStyleLower = (perfStyle ?? '').toLowerCase()
+    let baseInstruction = 'Speak as a professional audiobook narrator: warm, expressive, and engaging. '
+      + 'Use natural rising and falling intonation. '
+      + 'Breathe at every sentence boundary. '
+      + 'Slow down slightly before key moments for dramatic effect. '
+      + 'Honour every [break] and [long-break] pause marker in the text exactly as written.'
+
+    if (perfStyleLower.includes('storytelling') || perfStyleLower.includes('narrative')) {
+      baseInstruction = 'Speak as a master storyteller: immersive, vivid, and emotionally resonant. '
+        + 'Paint pictures with your voice — vary pace, pitch, and volume to bring the scene to life. '
+        + 'Use warm, intimate tone as if telling a bedtime story. '
+        + 'Breathe naturally between sentences. '
+        + 'Honour every [break] and [long-break] pause marker exactly as written.'
+    } else if (perfStyleLower.includes('documentary')) {
+      baseInstruction = 'Speak as a documentary narrator: authoritative, measured, and evocative. '
+        + 'Let each sentence land with weight. Pause meaningfully between ideas. '
+        + 'Honour every [break] and [long-break] pause marker exactly as written.'
+    } else if (perfStyleLower.includes('broadcast') || perfStyleLower.includes('authoritative')) {
+      baseInstruction = 'Speak as a broadcast journalist: clear, confident, and compelling. '
+        + 'Vary pace for emphasis. Pause between major points. '
+        + 'Honour every [break] and [long-break] pause marker exactly as written.'
+    } else if (perfStyleLower.includes('calm') || perfStyleLower.includes('soothing')) {
+      baseInstruction = 'Speak in a calm, gentle, and soothing tone: slow, soft, and reassuring. '
+        + 'Take your time between sentences. Breathe visibly. '
+        + 'Honour every [break] and [long-break] pause marker exactly as written.'
+    } else if (perfStyleLower.includes('energetic') || perfStyleLower.includes('excited')) {
+      baseInstruction = 'Speak with high energy and enthusiasm: bright, upbeat, and dynamic. '
+        + 'Punch key words. Keep momentum between sentences. '
+        + 'Honour every [break] and [long-break] pause marker exactly as written.'
+    }
+
+    if (typeof gender === 'string' && gender) {
+      baseInstruction = `Use a ${gender} voice. ` + baseInstruction
+    }
 
     const payload: Record<string, unknown> = {
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
       input: processedInput,
       response_format: format,
-      // instructions is prepended as [instructions] by OpenRouter — keep it minimal
-      // so it doesn't add extra bracket tokens that interfere with [break]/[long-break]
-      ...(typeof gender === 'string' && gender
-        ? { instructions: `Use a ${gender} voice.` }
-        : {}),
+      instructions: baseInstruction,
     }
     // Speed — baked into audio only when plan enables speed_control AND no reference
     // voice is in use. When cloning, speed distorts the reference voice; the client

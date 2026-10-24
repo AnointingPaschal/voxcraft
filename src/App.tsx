@@ -967,7 +967,6 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
       if (!selectedVoice) {
         const parts: string[] = []
         if (accent.value?.trim()) parts.push(`Accent and dialect: ${accent.value.trim()}.`)
-        if (perfStyle?.trim()) parts.push(`Performance style: ${perfStyle.trim()}.`)
         if (parts.length) accentInstruction = parts.join(' ')
       }
 
@@ -978,6 +977,9 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         text: text.trim(),
         format,
         accentInstruction,
+        // Always pass perfStyle so the backend can build narrative instructions
+        // regardless of whether a reference voice is active
+        perfStyle: perfStyle ?? '',
         ...(referenceDataUrl ? {} : { speed: pacing }),
         pitch,
         ...(selectedVoice ? { voiceId: selectedVoice.id } : {}),
