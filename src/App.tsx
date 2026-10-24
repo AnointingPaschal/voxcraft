@@ -1228,6 +1228,28 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           )}
         </div>
 
+        {/* ── Performance Style ──────────────────────────────────────────── */}
+        <div>
+          <FieldLabel>Performance Style</FieldLabel>
+          <div className="flex flex-wrap gap-2 mt-1">
+            {PERF_STYLES.map(style => (
+              <button
+                key={style}
+                type="button"
+                onClick={() => setPerfStyle(style)}
+                className={`text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+                  perfStyle === style
+                    ? 'border-[var(--accent)] text-white'
+                    : 'border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--text)]'
+                }`}
+                style={perfStyle === style ? { background: 'var(--accent)' } : {}}
+              >
+                {style}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex items-end gap-4">
           <div className="w-48">
             <FieldLabel>Master Format</FieldLabel>
