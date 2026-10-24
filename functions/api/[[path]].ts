@@ -221,14 +221,15 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       payload.pitch = pitch
     }
     if (referenceAudioDataUrl) {
-      // Fish Audio expects each reference as { audio: <base64>, text: <transcript> }
-      // The audio must be raw base64 — strip the data URI prefix if present
-      const rawAudio = referenceAudioDataUrl.includes(',')
-        ? referenceAudioDataUrl.split(',')[1]
-        : referenceAudioDataUrl
-      const ref: Record<string, string> = { audio: rawAudio }
-      if (referenceTranscript?.trim()) ref.text = referenceTranscript.trim()
-      payload.input_references = [ref]
+      // OpenRouter voice cloning format: input_references with type=input_audio
+      // The data field accepts either a full data URI or raw base64 — keep the full URI
+      const refs: unknown[] = [
+        { type: 'input_audio', input_audio: { data: referenceAudioDataUrl } },
+      ]
+      if (referenceTranscript?.trim()) {
+        refs.push({ type: 'text', text: referenceTranscript.trim() })
+      }
+      payload.input_references = refs
       // When cloning from reference audio Fish Audio is in voice-matching mode and
       // may suppress inline [break] cues. Use provider.options to pass Fish-native
       // parameters that work even in cloning mode:
@@ -258,26 +259,40 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     if (!upstream.ok) {
       const errText = await upstream.text()
       console.error(`[Voicera] Attempt 1 failed (${upstream.status}):`, errText)
-      await new Promise(r => setTimeout(r, 1200))
+      // Only retry on transient errors; surface auth/client errors immediately
+      if (![429, 500, 502, 503, 504].includes(upstream.status)) {
+        let orError = ''
+        try { orError = (JSON.parse(errText) as { error?: { message?: string } })?.error?.message ?? errText } catch { orError = errText }
+        const friendly = [401, 402, 403].includes(upstream.status)
+          ? `Voice engine auth error: ${orError}`
+          : `Voice engine error (${upstream.status}): ${orError}`
+        return e(friendly, upstream.status)
+      }
+      await new Promise(r => setTimeout(r, 2000))
+      // Retry with the exact same payload — model is already resolved with fallback
       upstream = await fetch('https://openrouter.ai/api/v1/audio/speech', {
-        method: 'POST', headers: orHeaders,
-        body: JSON.stringify({ model: config.openrouterModel, input: processedInput, instructions: payload.instructions, temperature: 0.3, repetition_penalty: 1.3, ...(payload.input_references ? { input_references: payload.input_references } : {}), ...(payload.provider ? { provider: payload.provider } : {}) }),
+        method: 'POST', headers: orHeaders, body: JSON.stringify(payload),
       })
       if (!upstream.ok) {
-        let friendly = 'Voice engine is busy. Please try again in a few seconds.'
-        if (upstream.status === 429) friendly = 'Rate limit reached. Please wait 15 seconds and try again.'
-        else if ([401, 402, 403].includes(upstream.status)) friendly = 'Voice engine quota exceeded. Please contact admin.'
+        const errText2 = await upstream.text()
+        console.error(`[Voicera] Attempt 2 failed (${upstream.status}):`, errText2)
+        let orError = ''
+        try { orError = (JSON.parse(errText2) as { error?: { message?: string } })?.error?.message ?? errText2 } catch { orError = errText2 }
+        let friendly = `Voice engine error (${upstream.status}): ${orError}`
+        if (upstream.status === 429) friendly = `Rate limit reached — ${orError}`
+        else if ([401, 402, 403].includes(upstream.status)) friendly = `Voice engine auth error: ${orError}`
         return e(friendly, upstream.status)
       }
     }
 
-    const ab = await upstream.arrayBuffer()
     const mime = format === 'wav' ? 'audio/wav' : 'audio/mpeg'
 
     // History is now saved explicitly by the client after applying speed+pitch
     // via POST /api/history/save — not auto-saved here.
 
-    return new Response(ab, { headers: { 'Content-Type': mime, 'Content-Length': String(ab.byteLength), 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining), 'X-Tokens-Limit': String(quota.limit), 'X-Tokens-Period': quota.period } })
+    // Stream the body directly — buffering with arrayBuffer() holds CPU active for
+    // the full download and can trip Cloudflare Pages' CPU timeout on longer scripts.
+    return new Response(upstream.body, { headers: { 'Content-Type': mime, 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining), 'X-Tokens-Limit': String(quota.limit), 'X-Tokens-Period': quota.period } })
   }
 
   // ── Audio History ─────────────────────────────────────────────────────────
