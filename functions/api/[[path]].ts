@@ -201,16 +201,11 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
       input: processedInput,
       response_format: format,
-      // Keep instructions short — Fish Audio prepends this as [instructions] to the text
-      instructions: [
-        'Speak naturally with clear articulation.',
-        'Honour every pause marker in the text.',
-        ...(typeof gender === 'string' && gender ? [`Use a ${gender} voice.`] : []),
-      ].join(' '),
-      // Lower temperature = more consistent, deliberate delivery
-      // (overridden to 0.3 below when reference audio cloning is active)
-      temperature: 0.5,
-      repetition_penalty: 1.3,
+      // instructions is prepended as [instructions] by OpenRouter — keep it minimal
+      // so it doesn't add extra bracket tokens that interfere with [break]/[long-break]
+      ...(typeof gender === 'string' && gender
+        ? { instructions: `Use a ${gender} voice.` }
+        : {}),
     }
     // Speed — baked into audio only when plan enables speed_control
     if (hasFx('speed_control') && typeof speed === 'number' && speed >= 0.5 && speed <= 2.0 && speed !== 1.0) {
@@ -230,21 +225,16 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
         refs.push({ type: 'text', text: referenceTranscript.trim() })
       }
       payload.input_references = refs
-      // When cloning from reference audio Fish Audio is in voice-matching mode and
-      // may suppress inline [break] cues. Use provider.options to pass Fish-native
-      // parameters that work even in cloning mode:
-      //   chunk_length: 100 — small segments force sentence-boundary splits
-      //   normalize: true   — spoken-word normalisation for numbers/symbols
+      // normalize MUST be false — text normalization strips [break]/[long-break] tokens.
+      // chunk_length: 200 — balanced segment size for cloning mode.
       payload.provider = {
         options: {
           'fish-audio': {
-            chunk_length: 100,
-            normalize: true,
+            chunk_length: 200,
+            normalize: false,
           },
         },
       }
-      // More deterministic in cloning mode — helps the model follow pause markers
-      payload.temperature = 0.3
     }
 
     const orHeaders = {
