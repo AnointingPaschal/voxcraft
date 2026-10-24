@@ -179,9 +179,18 @@ export default {
         }
       }
 
-      const ab = await upstream.arrayBuffer()
       const mime = format === 'wav' ? 'audio/wav' : 'audio/mpeg'
-      return new Response(ab, { headers: { 'Content-Type': mime, 'Content-Length': String(ab.byteLength), 'Cache-Control': 'no-store', 'X-Tokens-Remaining': String(quota.remaining), ...ch } })
+      // Stream the body directly instead of buffering with arrayBuffer() — buffering
+      // holds the CPU active for the full download and trips Cloudflare's CPU timeout
+      // on longer scripts. Piping the ReadableStream keeps CPU idle during the transfer.
+      return new Response(upstream.body, {
+        headers: {
+          'Content-Type': mime,
+          'Cache-Control': 'no-store',
+          'X-Tokens-Remaining': String(quota.remaining),
+          ...ch,
+        },
+      })
     }
 
     // ── Payment ───────────────────────────────────────────────────────────
