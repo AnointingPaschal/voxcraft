@@ -139,9 +139,10 @@ export default {
       const config = await getSiteConfig(env)
       if (!config.openrouterApiKey) return e('Voice engine not configured. Please contact admin.')
 
+      const model = config.openrouterModel || 'fish-audio/s2.1-pro-free:free'
       const styledInput = accentInstruction ? `[${accentInstruction}] ${text.trim()}` : text.trim()
       const payload: Record<string, unknown> = {
-        model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
+        model,
         input: styledInput,
         response_format: format,
       }
@@ -164,10 +165,16 @@ export default {
       if (!upstream.ok) {
         const errText = await upstream.text()
         console.error(`[Voicera] Attempt 1 failed (${upstream.status}):`, errText)
-        await new Promise(r => setTimeout(r, 1200))
+        // Only retry on transient errors (5xx / 429); auth/quota failures are permanent
+        if (![429, 500, 502, 503, 504].includes(upstream.status)) {
+          let friendly = 'Voice engine is busy. Please try again in a few seconds.'
+          if ([401, 402, 403].includes(upstream.status)) friendly = 'Voice engine quota exceeded. Please contact admin.'
+          return e(friendly, upstream.status)
+        }
+        await new Promise(r => setTimeout(r, 2000))
+        // Retry with the same full payload — model fallback is now guaranteed via `model` var
         upstream = await fetch('https://openrouter.ai/api/v1/audio/speech', {
-          method: 'POST', headers: orHeaders,
-          body: JSON.stringify({ model: config.openrouterModel, input: text.trim(), ...(payload.input_references ? { input_references: payload.input_references } : {}) }),
+          method: 'POST', headers: orHeaders, body: JSON.stringify(payload),
         })
         if (!upstream.ok) {
           const errText2 = await upstream.text()
