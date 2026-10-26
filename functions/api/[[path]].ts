@@ -114,7 +114,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const now = new Date()
     const periodKey = period === 'month' ? now.toISOString().slice(0, 7) : now.toISOString().slice(0, 10)
     const usage = await getUsage(env, user.id, periodKey)
-    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], allowedVoiceIds: plan.allowedVoiceIds ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0, charLimit: plan.charLimit ?? 10000 })
+    return json({ tokensUsed: usage.tokensUsed, limit: plan.tokensPerDay, remaining: Math.max(0, plan.tokensPerDay - usage.tokensUsed), plan: user.plan, period, enabledFeatures: plan.enabledFeatures ?? [], allowedVoiceIds: plan.allowedVoiceIds ?? [], historyRetentionDays: plan.historyRetentionDays ?? 0, charLimit: plan.charLimit })
   }
 
   // ── TTS Synthesize ────────────────────────────────────────────────────────
@@ -131,8 +131,9 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     const userPlan = plans.find(p => p.id === user.plan) ?? plans[0]!
     const fx = userPlan.enabledFeatures ?? []
 
-    const charCap = userPlan.charLimit ?? 10000
-    if (text.trim().length > charCap) return e(`Your script exceeds the ${charCap.toLocaleString()}-character limit for your plan. Upgrade for a higher limit.`, 400)
+    // charLimit of undefined means no per-synthesis cap configured — allow through.
+    const charCap = userPlan.charLimit
+    if (charCap != null && text.trim().length > charCap) return e(`Your script exceeds the ${charCap.toLocaleString()}-character limit for your plan. Upgrade for a higher limit.`, 400)
     // Voice access gate — allowedVoiceIds empty means all voices allowed
     if (voiceId) {
       const allowed = userPlan.allowedVoiceIds ?? []

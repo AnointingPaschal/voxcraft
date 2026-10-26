@@ -1349,7 +1349,7 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          maxLength={sc.maxChars}
+          maxLength={usage?.charLimit ?? sc.maxChars}
           placeholder="Type or paste your script here…"
           rows={8}
           className="w-full rounded-2xl px-4 py-3 text-sm outline-none studio-textarea"
@@ -1358,8 +1358,8 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
         />
 
         <div className="flex items-center justify-between -mt-1">
-          <span className={`text-xs tabular-nums studio-char-count${charsUsed > (usage?.charLimit ?? 10000) ? ' text-red-500' : ''}`}>
-            {charsUsed.toLocaleString()} / {(usage?.charLimit ?? 10000).toLocaleString()} characters
+          <span className={`text-xs tabular-nums studio-char-count${usage && charsUsed > usage.charLimit ? ' text-red-500' : ''}`}>
+            {charsUsed.toLocaleString()} / {usage ? usage.charLimit.toLocaleString() : '…'} characters
           </span>
           <button type="button" onClick={() => setText('')} className="text-xs flex items-center gap-1 transition-colors studio-clear-btn">
             <X size={11} /> Clear Script
@@ -1376,9 +1376,9 @@ function StudioBody({ user, onSignIn, onPlans, studioConfig: _sc }: {
           )}
         </AnimatePresence>
 
-        <button type="button" disabled={!text.trim() || status === 'loading' || charsUsed > (usage?.charLimit ?? 10000)}
+        <button type="button" disabled={!text.trim() || status === 'loading' || (!!usage && charsUsed > usage.charLimit)}
           onClick={() => { void handleSynthesize() }}
-          className={`w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all studio-synth-btn${!text.trim() || status === 'loading' || charsUsed > (usage?.charLimit ?? 10000) ? ' disabled' : ''}`}>
+          className={`w-full rounded-2xl py-4 text-base font-bold flex items-center justify-center gap-2 transition-all studio-synth-btn${!text.trim() || status === 'loading' || (!!usage && charsUsed > usage.charLimit) ? ' disabled' : ''}`}>
           {status === 'loading' ? <Loader2 size={18} className="animate-spin" /> : <AudioWaveform size={18} />}
           {status === 'loading' ? 'Synthesizing Master Audio…' : 'Synthesize Studio Audio'}
         </button>
