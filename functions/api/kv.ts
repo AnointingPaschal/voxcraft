@@ -118,8 +118,16 @@ const DEFAULT_PLANS: Plan[] = [
 ]
 
 export async function getPlans(env: Env): Promise<Plan[]> {
-  const plans = await env.KV.get<Plan[]>(keys.plans(), 'json')
-  return plans ?? DEFAULT_PLANS
+  const stored = await env.KV.get<Plan[]>(keys.plans(), 'json')
+  if (!stored) return DEFAULT_PLANS
+  // Merge stored plans with defaults so any new fields (charLimit, tokenPeriod,
+  // historyRetentionDays, enabledFeatures) added after initial setup are back-filled
+  // from the default — stored values always win where they exist.
+  return stored.map(storedPlan => {
+    const def = DEFAULT_PLANS.find(d => d.id === storedPlan.id)
+    if (!def) return storedPlan
+    return { ...def, ...storedPlan }
+  })
 }
 
 export async function putPlans(env: Env, plans: Plan[]): Promise<void> {
