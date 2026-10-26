@@ -172,8 +172,9 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
 
     // ── Delivery style tag ──────────────────────────────────────────────────
     // Fish Audio S2.1 reads [bracket] cues as style/emotion directions, NOT spoken text.
-    // The `instructions` field is prepended by OpenRouter as "[instructions text]" which
-    // IS read aloud — so we use a single compact bracket tag in the input instead.
+    // Language lock MUST come first — Fish Audio can drift into German/French/other
+    // languages when the style tag contains loanwords it associates with those languages.
+    const langLock = '[speak in English only]'
     const perfStyleLower = (perfStyle ?? '').toLowerCase()
     let styleTag = '[warm audiobook narrator, natural intonation, expressive storytelling]'
     if (perfStyleLower.includes('storytelling') || perfStyleLower.includes('narrative')) {
@@ -192,7 +193,7 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       styleTag = '[natural conversational tone, friendly, relaxed, like talking to a friend]'
     }
 
-    // Build the final input: style tag first, then the user's raw script
+    // Build the final input: language lock first, then style, then the user's raw script
     const baseText = text.trim()
 
     // ── Text pre-processing ─────────────────────────────────────────────────
@@ -222,8 +223,8 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
       .replace(/ {2,}/g, ' ')
       .trim()
 
-    // Style tag goes first so Fish Audio adopts the delivery before speaking
-    const processedInput = `${styleTag} ${processedScript}`
+    // Language lock first, then style tag — Fish Audio reads these left-to-right
+    const processedInput = `${langLock} ${styleTag} ${processedScript}`
 
     const payload: Record<string, unknown> = {
       model: config.openrouterModel || 'fish-audio/s2.1-pro-free:free',
@@ -240,9 +241,19 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
     if (hasFx('pitch_control') && typeof pitch === 'number' && pitch !== 0 && pitch >= -12 && pitch <= 12) {
       payload.pitch = pitch
     }
+    // Always set provider options: language lock + normalize=false for pause markers
+    payload.provider = {
+      options: {
+        'fish-audio': {
+          language: 'en',       // force English — prevents drift into German/French/etc
+          normalize: false,     // must be false to preserve [break]/[long-break] tokens
+          chunk_length: 200,
+        },
+      },
+    }
+
     if (referenceAudioDataUrl) {
       // OpenRouter voice cloning format: input_references with type=input_audio
-      // The data field accepts either a full data URI or raw base64 — keep the full URI
       const refs: unknown[] = [
         { type: 'input_audio', input_audio: { data: referenceAudioDataUrl } },
       ]
@@ -250,16 +261,6 @@ export async function onRequest(ctx: { request: Request; env: PagesEnv }): Promi
         refs.push({ type: 'text', text: referenceTranscript.trim() })
       }
       payload.input_references = refs
-      // normalize MUST be false — text normalization strips [break]/[long-break] tokens.
-      // chunk_length: 200 — balanced segment size for cloning mode.
-      payload.provider = {
-        options: {
-          'fish-audio': {
-            chunk_length: 200,
-            normalize: false,
-          },
-        },
-      }
     }
 
     const orHeaders = {
